@@ -72,6 +72,11 @@
   #help { position:fixed; left:10px; bottom:10px; font-size:12px; color:#3b4652; background:rgba(255,255,255,.75); padding:6px 10px; border-radius:8px; z-index:4; }
 
   /* 모바일 조이스틱 */
+  #acts { position:fixed; left:10px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:6; }
+  #acts button { width:64px; height:60px; border:0; border-radius:14px; background:rgba(255,255,255,.92); box-shadow:0 2px 8px rgba(0,0,0,.15); font-size:22px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; }
+  #acts button span { font-size:11px; color:#1f2a37; margin-top:3px; white-space:nowrap; }
+  #acts button.on { background:#12224a; } #acts button.on span { color:#fff; }
+  #acts button.shout { background:#c0392b; } #acts button.shout span { color:#fff; }
   #joy { position:fixed; left:20px; bottom:20px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.35); border:2px solid rgba(255,255,255,.7); z-index:6; touch-action:none; }
   #joyKnob { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.9); }
   @media (max-width: 700px) {
@@ -125,7 +130,11 @@
 
 <div id="quiz" class="hidden"></div>
 <button class="btn hidden" id="hint">투표판 열기</button>
-<div id="help" class="hidden">이동: 땅을 클릭 또는 W A S D · 시점: 마우스 끌기 · 확대: 휠 · 대화: Enter</div>
+<div id="help" class="hidden">이동: 땅을 클릭 또는 W A S D · 시점: 마우스 끌기 · 확대: 휠 · 대화: Enter · 동작: 1 앉기 2 손들기 3 책 4 소리치기</div>
+<div id="acts" class="hidden">
+  <button id="aSit"></button><button id="aHand"></button><button id="aBook"></button>
+  <button id="aShout" class="shout">📢<span>소리치기</span></button>
+</div>
 <div id="joy" class="hidden"><div id="joyKnob"></div></div>
 
 <script type="importmap">
@@ -205,6 +214,7 @@ const obstacles = [];           // 걸어서 못 지나가는 곳 {x0,x1,z0,z1}
 const block = (x0, x1, z0, z1) => obstacles.push({ x0, x1, z0, z1 });
 const terraces = [];            // 올라설 수 있는 계단 스탠드
 const discs = [];               // 올라설 수 있는 둥근 무대 {x,z,r,h}
+const seats = [];               // 앉을 수 있는 자리 (벤치·의자)
 
 // 글자 표지판 (스프라이트)
 function label(text, { size=48, bg='rgba(255,255,255,.9)', fg='#1f2a37', scale=1 } = {}) {
@@ -463,7 +473,7 @@ const STAGE = new THREE.Vector3(-30, 0, -2);
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.55), chairM); seat.position.y = 0.5;
     const back = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.06), chairM); back.position.set(0, 0.8, 0.27);
     for (const [lx, lz] of [[-.24, -.24], [.24, -.24], [-.24, .24], [.24, .24]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.05), chairM); l.position.set(lx, 0.25, lz); ch.add(l); }
-    ch.add(seat, back); ch.position.set(STAGE.x + Math.cos(a) * r, 0, STAGE.z - Math.sin(a) * r); ch.lookAt(STAGE.x, 0, STAGE.z); ch.rotateY(Math.PI); scene.add(ch);
+    ch.add(seat, back); ch.position.set(STAGE.x + Math.cos(a) * r, 0, STAGE.z - Math.sin(a) * r); seats.push({ x: ch.position.x, z: ch.position.z }); ch.lookAt(STAGE.x, 0, STAGE.z); ch.rotateY(Math.PI); scene.add(ch);
   }
   zoneSign('강연 · 토론 무대', STAGE.x, 11, STAGE.z);
   roundTree(-42, -16, 1.2); roundTree(-42, 12, 1.1); pineTree(-38, 18, 1.1);
@@ -484,6 +494,7 @@ zoneSign('열린 마당', 0, 6, 14);
 function stoneBench(x, z, len, rot = 0) {
   const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.55, 1.1), stone2); b.position.set(x, 0.28, z); b.rotation.y = rot; b.castShadow = b.receiveShadow = true; scene.add(b);
   const top = new THREE.Mesh(new THREE.BoxGeometry(len * 0.92, 0.08, 0.8), mat('#b08a62')); top.position.set(x, 0.6, z); top.rotation.y = rot; scene.add(top);
+  for (let t = -len / 2 + 0.6; t <= len / 2 - 0.6; t += 0.8) seats.push({ x: x + Math.cos(rot) * t, z: z - Math.sin(rot) * t });
 }
 stoneBench(-10, 22, 7); stoneBench(10, 24, 7); stoneBench(-14, 8, 6, Math.PI / 2); stoneBench(-12, 32, 6, 0.3);
 // 청사초롱 길 (입구 길 양옆)
@@ -522,7 +533,7 @@ const BOOK = new THREE.Vector3(31, 0, -4);
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.95, 6), cm); leg.position.y = 0.47; g.add(leg);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 6), cm); pole.position.y = 1.9; g.add(pole);
     const um = new THREE.Mesh(new THREE.ConeGeometry(2.1, 0.7, 8), mat('#fbf7ee')); um.position.y = 3.2; g.add(um);
-    for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2; const ch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cm); ch.position.set(Math.cos(a) * 1.2, 0.25, Math.sin(a) * 1.2); g.add(ch); }
+    for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2; const ch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cm); ch.position.set(Math.cos(a) * 1.2, 0.25, Math.sin(a) * 1.2); g.add(ch); seats.push({ x: tx + Math.cos(a) * 1.2, z: tz + Math.sin(a) * 1.2 }); }
     g.traverse(m => m.isMesh && (m.castShadow = true)); g.position.set(tx, 0, tz); scene.add(g);
   }
   zoneSign('한옥 북카페 · 함께 읽기', BOOK.x - 6, 9, BOOK.z - 8);
@@ -547,7 +558,7 @@ const STELE = new THREE.Vector3(14, 0, 8);
     const tx = 17 + (i % 3) * 6, tz = 34 + Math.floor(i / 3) * 4.5;
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.06, 16), tm); add(top, tx, 0.95, tz);
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.95, 6), cm); add(leg, tx, 0.47, tz);
-    for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + .4; const ch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cm); add(ch, tx + Math.cos(a) * 1.1, 0.25, tz + Math.sin(a) * 1.1); }
+    for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + .4; const ch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cm); add(ch, tx + Math.cos(a) * 1.1, 0.25, tz + Math.sin(a) * 1.1); seats.push({ x: tx + Math.cos(a) * 1.1, z: tz + Math.sin(a) * 1.1 }); }
   }
   // 골든벨
   const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.1, 0.7, 32), marble); add(ped, BELL.x, 0.35, BELL.z);
@@ -590,6 +601,11 @@ function groundY(x, z) {
     if (a > t.a0 && a < t.a1 && r >= t.r0 && r < t.r0 + t.step * t.n) return t.h * (Math.floor((r - t.r0) / t.step) + 1);
   }
   return 0;
+}
+// 의자·벤치·스탠드 위면 걸터앉고, 아니면 바닥에 앉기
+function onSeat(x, z) {
+  for (const t of terraces) { const dx = x - t.x, dz = z - t.z, r = Math.hypot(dx, dz), a = Math.atan2(-dz, dx); if (a > t.a0 && a < t.a1 && r >= t.r0 && r < t.r0 + t.step * t.n) return true; }
+  return seats.some(p => Math.hypot(p.x - x, p.z - z) < 0.9);
 }
 // 막힌 곳 밀어내기
 function resolve(p) {
@@ -762,22 +778,45 @@ function makeAvatar(nick, color, age = 'young', gender = 'n') {
   const top = (child ? 2.25 : 2.25) * scale + (child ? 0.15 : 0);
   const name = label(nick, { size: 40, scale: 0.9 }); name.position.y = top + 0.35;
   g.add(name);
-  g.userData = { name, bubble: null, bubbleTimer: 0, parts, top, walk: 0 };
+  // 책 (펼친 책 / 덮은 책)
+  const book = new THREE.Group(); book.position.set(0, 1.12, 0.48); book.rotation.x = -0.6; book.visible = false;
+  const cover = mat('#2f6fde'), paper = mat('#fbf8f0');
+  const openBk = new THREE.Group();
+  for (const sd of [-1, 1]) {
+    const pg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.4), paper); pg.position.x = sd * 0.15; pg.rotation.z = sd * 0.18; openBk.add(pg);
+    const cv = new THREE.Mesh(new THREE.BoxGeometry(0.31, 0.012, 0.42), cover); cv.position.set(sd * 0.155, -0.016, 0); cv.rotation.z = sd * 0.18; openBk.add(cv);
+  }
+  const closedBk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.42), cover); closedBk.rotation.z = Math.PI / 2; closedBk.position.set(0.18, 0, 0);
+  book.add(openBk, closedBk); fig.add(book);
+  g.userData = { name, bubble: null, bubbleTimer: 0, parts, top, walk: 0, fig, scale, book, openBk, closedBk,
+    pose: { sit: false, hand: false, book: 0 }, shout: 0, bookT: 0 };
   scene.add(g);
   return g;
 }
-// 걸을 때 팔다리 흔들기
+// 걸을 때 팔다리 흔들기 + 동작(앉기·손들기·책·소리치기)
+// pose.book: 0 없음, 1 펼침, 2 덮음(손에 든 채)
 function animateWalk(av, speed, dt) {
   const u = av.userData; if (!u.parts) return;
-  const moving = speed > 0.3;
+  const pose = u.pose || {};
+  const moving = speed > 0.3 && !pose.sit;
   u.walk += dt * (moving ? Math.min(12, 4 + speed * 1.3) : 0);
-  const amp = moving ? 0.55 : 0;
-  const k = Math.min(1, dt * 10);
-  const sw = Math.sin(u.walk) * amp;
-  u.parts.legs[0].rotation.x += (sw - u.parts.legs[0].rotation.x) * k;
-  u.parts.legs[1].rotation.x += (-sw - u.parts.legs[1].rotation.x) * k;
-  u.parts.arms[0].rotation.x += (-sw * 0.8 - u.parts.arms[0].rotation.x) * k;
-  u.parts.arms[1].rotation.x += (sw * 0.8 - u.parts.arms[1].rotation.x) * k;
+  const sw = moving ? Math.sin(u.walk) * 0.55 : 0;
+  const T = performance.now() / 1000;
+  let legL = sw, legR = -sw, armL = -sw * 0.8, armR = sw * 0.8, figY = 0, armLz = 0;
+  if (pose.sit) { legL = legR = -1.45; armL = armR = -0.35; figY = onSeat(av.position.x, av.position.z) ? -0.42 : -0.84; }
+  if (pose.book) { armL = armR = -1.05; }
+  if (pose.hand) { armL = -2.95; armLz = 0.15; }
+  if (u.shout > 0) { u.shout -= dt; armL = -2.7 + Math.sin(T * 14) * 0.35; armLz = 0.1; }
+  const k = Math.min(1, dt * 10), L = u.parts.legs, A = u.parts.arms;
+  L[0].rotation.x += (legL - L[0].rotation.x) * k;
+  L[1].rotation.x += (legR - L[1].rotation.x) * k;
+  A[0].rotation.x += (armL - A[0].rotation.x) * k;
+  A[1].rotation.x += (armR - A[1].rotation.x) * k;
+  A[0].rotation.z += (-armLz - A[0].rotation.z) * k;
+  u.fig.position.y += (figY * u.scale - u.fig.position.y) * k;
+  // 책: 펼치면 넓게, 덮으면 한 권
+  u.book.visible = !!pose.book;
+  u.openBk.visible = pose.book === 1; u.closedBk.visible = pose.book === 2;
 }
 function say(av, text) {
   if (av.userData.bubble) av.remove(av.userData.bubble);
@@ -888,6 +927,7 @@ function updateMe(dt) {
       const open = me.target.open; me.target = null; marker.visible = false; if (open) open();
     } else { speed = Math.min(5.5, d * 3 + 1.5); dx = tx / d; dz = tz / d; }
   }
+  if (speed > 0 && me.avatar.userData.pose.sit) { me.avatar.userData.pose.sit = false; updateActBar(); }
   if (speed > 0) {
     const bx = me.x, bz = me.z;
     const p = resolve({ x: me.x + dx * speed * dt, z: me.z + dz * speed * dt });
@@ -948,7 +988,7 @@ async function join() {
   me.avatar = makeAvatar(nick, myColor, myAge, myGender);
 
   $('enter').classList.add('hidden');
-  ['top','chat'].forEach(id => $(id).classList.remove('hidden'));
+  ['top','chat','acts'].forEach(id => $(id).classList.remove('hidden')); updateActBar();
   if (isTouch) $('joy').classList.remove('hidden'); else $('help').classList.remove('hidden');
 
   // 지난 대화 30개 불러오기
@@ -977,6 +1017,12 @@ async function join() {
     .on('broadcast', { event: 'pos' }, ({ payload: p }) => {
       const o = ensureOther(p.id, p.n, p.c, p.a, p.g);
       o.tx = p.x; o.tz = p.z; o.ty = p.y; o.ry = p.r; o.seen = performance.now(); o.placed = true;
+      if (p.s !== undefined) { const pp = o.avatar.userData.pose, hadHand = pp.hand; pp.sit = !!(p.s & 1); pp.hand = !!(p.s & 2); pp.book = (p.s >> 2) & 3;
+        if (pp.hand && !hadHand) addLog(`✋ ${esc(p.n)} 님이 손을 들었습니다.`, 'sys'); }
+    })
+    .on('broadcast', { event: 'shout' }, ({ payload: p }) => {
+      addLog(`<b style="color:#c0392b">📢 ${esc(p.n)}</b>${esc(p.t)}`);
+      const o = others.get(p.id); if (o) { o.avatar.userData.shout = 3; shoutBubble(o.avatar, p.t); }
     })
     .on('broadcast', { event: 'chat' }, ({ payload: p }) => {
       addLog(`<b>${esc(p.n)}</b>${esc(p.t)}`);
@@ -998,12 +1044,52 @@ function sendPos(force) {
   if (!channel) return;
   const now = performance.now();
   if (!force && now - lastSent < 150) return; // 1초에 약 6~7번
-  const p = { id: myId, n: me.nick, c: me.color, a: me.age, g: me.gender, x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.avatar.position.y.toFixed(2), r: +me.ry.toFixed(2) };
-  const k = `${p.x},${p.z},${p.r}`;
+  const pz = me.avatar.userData.pose;
+  const p = { id: myId, n: me.nick, c: me.color, a: me.age, g: me.gender, s: (pz.sit ? 1 : 0) | (pz.hand ? 2 : 0) | (pz.book << 2), x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.avatar.position.y.toFixed(2), r: +me.ry.toFixed(2) };
+  const k = `${p.x},${p.z},${p.r},${p.s}`;
   if (!force && k === lastKey && now - lastSent < 3000) return; // 가만히 있으면 3초에 한 번만
   lastKey = k; lastSent = now;
   channel.send({ type: 'broadcast', event: 'pos', payload: p });
 }
+
+// ── 동작 버튼 ──
+function shoutBubble(av, text) {
+  if (av.userData.bubble) av.remove(av.userData.bubble);
+  const t = text.length > 18 ? text.slice(0, 17) + '…' : text;
+  const b = label('📢 ' + t, { size: 52, bg: 'rgba(192,57,43,.95)', fg: '#ffffff', scale: 1.5 }); b.position.y = av.userData.top + 1.2;
+  av.add(b); av.userData.bubble = b; av.userData.bubbleTimer = 4;
+}
+function act(kind) {
+  if (!me.avatar) return;
+  const u = me.avatar.userData, pz = u.pose;
+  if (kind === 'sit') { pz.sit = !pz.sit; me.target = null; marker.visible = false; }
+  if (kind === 'hand') {
+    pz.hand = !pz.hand;
+    if (pz.hand) addLog(`✋ ${esc(me.nick)} 님이 손을 들었습니다.`, 'sys');
+  }
+  if (kind === 'book') pz.book = pz.book === 1 ? 2 : (pz.book === 2 ? 0 : 1);   // 펼치기 → 덮기 → 집어넣기
+  if (kind === 'shout') {
+    const typed = $('chatInput').value.trim().slice(0, 60);
+    const t = typed || '주민자치 보장하라!';
+    $('chatInput').value = '';
+    u.shout = 3; shoutBubble(me.avatar, t);
+    addLog(`<b style="color:#c0392b">📢 ${esc(me.nick)}</b>${esc(t)}`);
+    channel?.send({ type: 'broadcast', event: 'shout', payload: { id: myId, n: me.nick, t } });
+  }
+  updateActBar(); sendPos(true);
+}
+function updateActBar() {
+  const pz = me.avatar?.userData.pose || {};
+  $('aSit').innerHTML = pz.sit ? '🧍<span>서기</span>' : '🪑<span>앉기</span>';
+  $('aHand').innerHTML = pz.hand ? '👇<span>손 내리기</span>' : '✋<span>손들기</span>';
+  $('aBook').innerHTML = pz.book === 1 ? '📕<span>책 덮기</span>' : (pz.book === 2 ? '🎒<span>책 넣기</span>' : '📖<span>책 펼치기</span>');
+  ['aSit', 'aHand', 'aBook'].forEach((id, i) => $(id).classList.toggle('on', [pz.sit, pz.hand, !!pz.book][i]));
+}
+$('aSit').onclick = () => act('sit'); $('aHand').onclick = () => act('hand'); $('aBook').onclick = () => act('book'); $('aShout').onclick = () => act('shout');
+addEventListener('keydown', e => {
+  if (typing || !me.avatar) return;
+  const m = { Digit1: 'sit', Digit2: 'hand', Digit3: 'book', Digit4: 'shout' }[e.code]; if (m) act(m);
+});
 
 // ── 채팅 ──
 $('chatInput').addEventListener('focus', () => { typing = true; Object.keys(keys).forEach(k => keys[k] = false); });

@@ -4,6 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>자치분권 아고라</title>
+<meta name="description" content="누구나 아바타로 들어와 이야기하고, 안건에 투표하고, 책을 함께 읽는 (사)자치분권연구소의 온라인 한옥 마당 공론장">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="자치분권 아고라">
+<meta property="og:title" content="자치분권 아고라">
+<meta property="og:description" content="누구나 아바타로 들어와 이야기하고, 안건에 투표하고, 책을 함께 읽는 온라인 한옥 마당 공론장 · (사)자치분권연구소">
+<meta property="og:url" content="https://neoschoi.github.io/cadi-agora/">
+<meta property="og:image" content="https://neoschoi.github.io/cadi-agora/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://neoschoi.github.io/cadi-agora/og.png">
+<meta name="theme-color" content="#0b1630">
 <style>
   :root { --ink:#1f2a37; --accent:#2f6fde; --paper:#fbf8f2; }
   * { box-sizing:border-box; }
@@ -33,7 +45,10 @@
   #intro .ig { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:22px 0; }
   #intro .ig div { background:rgba(255,255,255,.06); border:1px solid rgba(201,169,110,.35); border-radius:14px; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
   #intro .ig span { font-size:26px; } #intro .ig b { color:#f3ead6; font-size:16px; } #intro .ig small { color:#a9b6d3; font-size:13px; }
-  #intro .btn { background:#c9a96e; color:#0b1630; font-weight:800; padding:14px 30px; font-size:17px; }
+  #intro .ibar { height:4px; background:rgba(255,255,255,.12); border-radius:2px; overflow:hidden; max-width:320px; margin:8px auto 10px; }
+  #intro .ibar div { height:100%; width:0; background:#c9a96e; }
+  #intro .ibar div.run { width:100%; transition:width 5s linear; }
+  #intro .icount { color:#a9b6d3; font-size:13px; }
   #intro .io { margin-top:22px; color:#6f7fa3; font-size:12px; letter-spacing:.1em; }
   #nickErr { color:#c0392b; font-size:14px; min-height:18px; margin:-6px 0 8px; }
   #introAgain { display:block; text-align:center; margin-top:12px; font-size:13px; color:#5b6572; }
@@ -140,7 +155,8 @@
       <div><span>📖</span><b>함께 읽기</b><small>한옥 북카페에서 책 나누기</small></div>
       <div><span>🔔</span><b>골든벨 퀴즈</b><small>주민자치 100문 100답</small></div>
     </div>
-    <button class="btn" id="introGo">마당으로 들어가기</button>
+    <div class="ibar"><div id="introBar"></div></div>
+    <div class="icount" id="introCount">5초 뒤 마당으로 들어갑니다 · 화면을 누르면 바로 들어가요</div>
     <div class="io">(사)자치분권연구소</div>
   </div>
 </div>
@@ -1115,8 +1131,17 @@ async function join() {
   (past || []).reverse().forEach(m => addLog(`<b>${esc(m.nickname)}</b>${esc(m.body)}`));
   addLog('아고라 마당에 들어왔습니다. 가고 싶은 곳을 찍으면 걸어가요.', 'sys');
 }
-$('introGo').onclick = () => { store('agora_intro_seen', '1'); $('intro').classList.add('hidden'); };
-$('introAgain').onclick = e => { e.preventDefault(); $('intro').classList.remove('hidden'); };
+// 소개 화면: 5초 뒤 자동으로 닫힘 (누르면 바로)
+let introTimer = null;
+function closeIntro() { clearTimeout(introTimer); store('agora_intro_seen', '1'); $('intro').classList.add('hidden'); }
+function showIntro() {
+  $('intro').classList.remove('hidden');
+  const bar = $('introBar'); bar.classList.remove('run'); void bar.offsetWidth;
+  requestAnimationFrame(() => bar.classList.add('run'));
+  clearTimeout(introTimer); introTimer = setTimeout(closeIntro, 5000);
+}
+$('intro').onclick = closeIntro;
+$('introAgain').onclick = e => { e.preventDefault(); showIntro(); };
 $('enterBtn').onclick = join;
 $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 
@@ -1374,7 +1399,7 @@ loop();
 {
   // 페이지를 연 지 3초가 될 때까지, 그리고 장면이 그려진 뒤 최소 0.9초는 보여줌
   const hide = () => { $('loader').classList.add('out'); setTimeout(() => $('loader').remove(), 1000); };
-  if (!store('agora_intro_seen')) $('intro').classList.remove('hidden');
+  if (!store('agora_intro_seen')) showIntro();
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(hide, Math.max(900, 3000 - performance.now()))));
 }
 

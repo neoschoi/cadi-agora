@@ -118,6 +118,13 @@
   #acts button { width:64px; height:60px; border:0; border-radius:14px; background:rgba(255,255,255,.92); box-shadow:0 2px 8px rgba(0,0,0,.15); font-size:22px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; }
   #acts button span { font-size:11px; color:#1f2a37; margin-top:3px; white-space:nowrap; }
   #acts button.on { background:#12224a; } #acts button.on span { color:#fff; }
+  #acts button.mic-on { background:#2ea05a; } #acts button.mic-on span { color:#fff; }
+  #acts button.mic-wait { background:#e9b44c; }
+  #hands { position:fixed; right:10px; top:60px; width:220px; max-height:50vh; overflow-y:auto; background:rgba(255,255,255,.95); border-radius:12px; padding:10px; z-index:7; box-shadow:0 4px 16px rgba(0,0,0,.18); font-size:14px; }
+  #hands h4 { margin:0 0 6px; font-size:14px; color:#12224a; }
+  #hands .row { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:4px 0; border-top:1px solid #eef1f5; }
+  #hands button { border:0; border-radius:8px; padding:5px 9px; font-size:13px; cursor:pointer; background:#2ea05a; color:#fff; }
+  #hands button.stop { background:#8d939c; }
   #acts button.shout { background:#c0392b; } #acts button.shout span { color:#fff; }
   #joy { position:fixed; left:20px; bottom:20px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.35); border:2px solid rgba(255,255,255,.7); z-index:6; touch-action:none; }
   #joyKnob { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.9); }
@@ -135,6 +142,7 @@
     #acts { top:48px; left:8px; transform:none; flex-direction:row; gap:5px; }
     #acts button { width:42px; height:40px; font-size:15px; border-radius:10px; background:rgba(255,255,255,.82); }
     #acts button span { font-size:9px; }
+    #hands { top:96px; right:8px; width:190px; font-size:13px; }
     #joy { width:84px; height:84px; left:10px; bottom:12px; }
     #joyKnob { left:25px; top:25px; width:30px; height:30px; }
     #chat { width:calc(100vw - 112px); right:8px; bottom:8px; }
@@ -213,11 +221,12 @@
 
 <div id="quiz" class="hidden"></div>
 <button class="btn hidden" id="hint">투표판 열기</button>
-<div id="help" class="hidden">이동: 땅을 클릭 또는 W A S D · 시점: 마우스 끌기 · 확대: 휠 · 대화: Enter · 동작: 1 앉기 2 손들기 3 책 4 소리치기</div>
+<div id="help" class="hidden">이동: 땅을 클릭 또는 W A S D · 시점: 마우스 끌기 · 확대: 휠 · 대화: Enter · 동작: 1 앉기 2 손들기 3 책 4 소리치기 5 마이크</div>
 <div id="acts" class="hidden">
-  <button id="aSit"></button><button id="aHand"></button><button id="aBook"></button>
+  <button id="aMic"></button><button id="aSit"></button><button id="aHand"></button><button id="aBook"></button>
   <button id="aShout" class="shout">📢<span>소리치기</span></button>
 </div>
+<div id="hands" class="hidden"></div>
 <div id="joy" class="hidden"><div id="joyKnob"></div></div>
 
 <script type="importmap">
@@ -536,7 +545,7 @@ const STAGE = new THREE.Vector3(-30, 0, -2);
   g.font = 'bold 120px sans-serif'; g.fillText('강연 · 토론 무대', 960, 330);
   g.fillStyle = '#f0a548'; g.font = 'bold 72px sans-serif'; g.fillText('오늘의 안건을 함께 이야기해요', 960, 480);
   g.fillStyle = '#cdd5e7'; g.font = '56px sans-serif';
-  g.fillText('무대에 올라 말하면 모두에게 말풍선이 보여요', 960, 640);
+  g.fillText('무대에 올라 마이크를 켜면 강연장 모두에게 들려요', 960, 640);
   g.fillText('안건 투표판 · 골든벨 퀴즈 · 한옥 북카페도 둘러보세요', 960, 740);
   g.fillStyle = '#a9b6d3'; g.font = '44px sans-serif'; g.fillText('(사)자치분권연구소', 960, 960);
   const screen = panelMesh(c, 15); screen.position.set(STAGE.x - 8.85, 5, STAGE.z); screen.rotation.y = Math.PI / 2; scene.add(screen);
@@ -861,6 +870,7 @@ function makeAvatar(nick, color, age = 'young', gender = 'n') {
   const top = (child ? 2.25 : 2.25) * scale + (child ? 0.15 : 0);
   const name = label(nick, { size: 40, scale: 0.9 }); name.position.y = top + 0.35;
   g.add(name);
+  const micTag = label('🎤', { size: 40, bg: 'rgba(46,160,90,.95)', fg: '#fff', scale: 0.8 }); micTag.position.y = top + 0.95; micTag.visible = false; g.add(micTag);
   // 책 (펼친 책 / 덮은 책)
   const book = new THREE.Group(); book.position.set(0, 1.12, 0.48); book.rotation.x = -0.6; book.visible = false;
   const cover = mat('#2f6fde'), paper = mat('#fbf8f0');
@@ -871,7 +881,7 @@ function makeAvatar(nick, color, age = 'young', gender = 'n') {
   }
   const closedBk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.42), cover); closedBk.rotation.z = Math.PI / 2; closedBk.position.set(0.18, 0, 0);
   book.add(openBk, closedBk); fig.add(book);
-  g.userData = { name, bubble: null, bubbleTimer: 0, parts, top, walk: 0, fig, scale, book, openBk, closedBk,
+  g.userData = { name, micTag, bubble: null, bubbleTimer: 0, parts, top, walk: 0, fig, scale, book, openBk, closedBk,
     pose: { sit: false, hand: false, book: 0 }, shout: 0, bookT: 0 };
   scene.add(g);
   return g;
@@ -1053,7 +1063,7 @@ function ensureOther(id, nick, color, age, gender) {
 }
 function removeOther(id) {
   const o = others.get(id); if (!o) return;
-  scene.remove(o.avatar); others.delete(id);
+  scene.remove(o.avatar); others.delete(id); closePeer(id, false);
 }
 
 function addLog(html, cls='m') {
@@ -1094,7 +1104,8 @@ async function join() {
     })
     .on('broadcast', { event: 'pos' }, ({ payload: p }) => {
       const o = ensureOther(p.id, p.n, p.c, p.a, p.g);
-      o.tx = p.x; o.tz = p.z; o.ty = p.y; o.ry = p.r; o.seen = performance.now(); o.placed = true;
+      o.tx = p.x; o.tz = p.z; o.ty = p.y; o.ry = p.r; o.seen = performance.now(); o.placed = true; o.s = p.s || 0; o.nick = p.n;
+      o.avatar.userData.micTag.visible = !!(o.s & 16);
       if (p.s !== undefined) { const pp = o.avatar.userData.pose, hadHand = pp.hand; pp.sit = !!(p.s & 1); pp.hand = !!(p.s & 2); pp.book = (p.s >> 2) & 3;
         if (pp.hand && !hadHand) addLog(`✋ ${esc(p.n)} 님이 손을 들었습니다.`, 'sys'); }
     })
@@ -1106,6 +1117,8 @@ async function join() {
       addLog(`<b>${esc(p.n)}</b>${esc(p.t)}`);
       const o = others.get(p.id); if (o) say(o.avatar, p.t);
     })
+    .on('broadcast', { event: 'rtc' }, ({ payload: p }) => { if (p.to === myId) onSignal(p.from, p.d); })
+    .on('broadcast', { event: 'grant' }, ({ payload: p }) => { if (p.to === myId) onGrant(p); })
     .on('broadcast', { event: 'voted' }, () => { if (!$('vote').classList.contains('hidden')) loadAgendas(); })
     .subscribe();
   await new Promise(res => { syncReady = res; setTimeout(res, 3000); });
@@ -1164,12 +1177,157 @@ function sendPos(force) {
   const now = performance.now();
   if (!force && now - lastSent < 150) return; // 1초에 약 6~7번
   const pz = me.avatar.userData.pose;
-  const p = { id: myId, n: me.nick, c: me.color, a: me.age, g: me.gender, s: (pz.sit ? 1 : 0) | (pz.hand ? 2 : 0) | (pz.book << 2), x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.avatar.position.y.toFixed(2), r: +me.ry.toFixed(2) };
+  const p = { id: myId, n: me.nick, c: me.color, a: me.age, g: me.gender, s: (pz.sit ? 1 : 0) | (pz.hand ? 2 : 0) | (pz.book << 2) | (voice.micOn ? 16 : 0) | (voice.granted ? 32 : 0), x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.avatar.position.y.toFixed(2), r: +me.ry.toFixed(2) };
   const k = `${p.x},${p.z},${p.r},${p.s}`;
   if (!force && k === lastKey && now - lastSent < 3000) return; // 가만히 있으면 3초에 한 번만
   lastKey = k; lastSent = now;
   channel.send({ type: 'broadcast', event: 'pos', payload: p });
 }
+
+
+// ── 음성 대화 (브라우저끼리 직접 연결, 신호는 Supabase로 주고받음) ──
+// 마당: 가까이(약 12m) 있는 사람끼리 말하고 들음. 멀수록 작게 들림.
+// 강연장: 무대 위 사람(강연자)과 강연자가 허락한 사람만 말할 수 있고, 강연장 안 모두가 들음.
+const voice = { micOn: false, stream: null, granted: false, wasInHall: false, lastTick: 0, handsKey: '' };
+const peers = new Map(); // id -> { pc, polite, making, ignore, audio, idleSince }
+const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+const NEAR = 12, NEAR_KEEP = 15;
+const inHall = (x, z) => Math.hypot(x - STAGE.x, z - STAGE.z) < 24 && x > STAGE.x - 9;
+const onStage = (x, z) => Math.hypot(x - STAGE.x, z - STAGE.z) < 7.2;
+const meSpeaker = () => onStage(me.x, me.z) || voice.granted;
+const oSpeaker = o => onStage(o.tx, o.tz) || !!(o.s & 32);
+const canTalk = () => !inHall(me.x, me.z) || meSpeaker();
+
+function sig(to, d) { channel?.send({ type: 'broadcast', event: 'rtc', payload: { from: myId, to, d } }); }
+function getPeer(id) {
+  let P = peers.get(id);
+  if (P && P.pc.connectionState !== 'closed') return P;
+  const pc = new RTCPeerConnection({ iceServers: ICE });
+  const audio = document.createElement('audio'); audio.autoplay = true; audio.setAttribute('playsinline', ''); document.body.appendChild(audio);
+  P = { pc, polite: myId < id, making: false, ignore: false, audio, idleSince: 0 };
+  peers.set(id, P);
+  pc.ontrack = e => { audio.srcObject = e.streams[0] || new MediaStream([e.track]); audio.play().catch(() => {}); };
+  pc.onicecandidate = e => { if (e.candidate) sig(id, { candidate: e.candidate.toJSON() }); };
+  pc.onnegotiationneeded = async () => {
+    try { P.making = true; await pc.setLocalDescription(); sig(id, { description: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } }); }
+    catch (e) { console.warn(e); } finally { P.making = false; }
+  };
+  pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') closePeer(id, true); };
+  if (voice.stream) for (const t of voice.stream.getAudioTracks()) pc.addTrack(t, voice.stream);
+  return P;
+}
+function closePeer(id, tell) {
+  const P = peers.get(id); if (!P) return;
+  peers.delete(id);
+  try { P.pc.close(); } catch {}
+  P.audio.srcObject = null; P.audio.remove();
+  if (tell) sig(id, { bye: true });
+}
+async function onSignal(from, d) {
+  if (d.bye) { closePeer(from, false); return; }
+  const P = getPeer(from), pc = P.pc; P.idleSince = 0;
+  try {
+    if (d.description) {
+      const collision = d.description.type === 'offer' && (P.making || pc.signalingState !== 'stable');
+      P.ignore = !P.polite && collision; if (P.ignore) return;
+      await pc.setRemoteDescription(d.description);
+      if (d.description.type === 'offer') { await pc.setLocalDescription(); sig(from, { description: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } }); }
+    } else if (d.candidate) {
+      try { await pc.addIceCandidate(d.candidate); } catch (e) { if (!P.ignore) console.warn(e); }
+    }
+  } catch (e) { console.warn(e); }
+}
+// 둘 사이에 소리가 오가야 하는지
+function wantLink(o, connected) {
+  const mh = inHall(me.x, me.z), oh = inHall(o.tx, o.tz);
+  if (mh !== oh) return false;
+  if (mh) return meSpeaker() || oSpeaker(o);
+  return Math.hypot(o.tx - me.x, o.tz - me.z) < (connected ? NEAR_KEEP : NEAR);
+}
+function volumeFor(o) {
+  if (inHall(me.x, me.z)) return oSpeaker(o) ? 1 : 0;
+  const d = Math.hypot(o.tx - me.x, o.tz - me.z);
+  return Math.max(0, Math.min(1, (NEAR_KEEP - d) / (NEAR_KEEP - 4)));
+}
+function applyMicGate() {
+  const on = voice.micOn && canTalk();
+  voice.stream?.getAudioTracks().forEach(t => t.enabled = on);
+  if (me.avatar) me.avatar.userData.micTag.visible = voice.micOn;
+}
+function voiceTick(force) {
+  const now = performance.now();
+  if (!force && now - voice.lastTick < 500) return;
+  voice.lastTick = now;
+  const hall = inHall(me.x, me.z);
+  if (hall && !voice.wasInHall) addLog('🎤 강연장에서는 무대 위 강연자만 말할 수 있어요. 말하고 싶으면 ✋손을 들어 허락을 받으세요.', 'sys');
+  if (!hall && voice.granted) { voice.granted = false; sendPos(true); }
+  voice.wasInHall = hall;
+  for (const [id, o] of others) {
+    const P = peers.get(id);
+    const want = wantLink(o, !!P) && (voice.micOn || !!(o.s & 16));
+    if (want) {
+      if (!P && voice.micOn) getPeer(id);           // 내 마이크가 켜져 있으면 내가 먼저 연결
+      if (P) { P.idleSince = 0; P.audio.volume = volumeFor(o); if (P.audio.paused && P.audio.srcObject) P.audio.play().catch(() => {}); }
+    } else if (P) {
+      P.audio.volume = 0;
+      if (!P.idleSince) P.idleSince = now; else if (now - P.idleSince > 3000) closePeer(id, true);
+    }
+  }
+  applyMicGate(); updateMicBtn(); updateHands();
+}
+async function toggleMic() {
+  if (!me.avatar) return;
+  if (voice.micOn) { voice.micOn = false; applyMicGate(); updateMicBtn(); sendPos(true); addLog('🔇 마이크를 껐어요.', 'sys'); return; }
+  if (!voice.stream) {
+    try {
+      voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch (e) {
+      addLog('🎤 마이크를 쓸 수 없어요. 브라우저에서 마이크 허용을 눌러 주세요. 카카오톡 안에서 열었다면 크롬·사파리로 열어 보세요.', 'sys');
+      return;
+    }
+    for (const [, P] of peers) for (const t of voice.stream.getAudioTracks()) P.pc.addTrack(t, voice.stream);
+  }
+  voice.micOn = true; applyMicGate(); sendPos(true);
+  addLog(canTalk() ? '🎤 마이크를 켰어요. 가까이 있는 사람에게 목소리가 들려요.' : '🎤 마이크를 켰어요. 강연장에서는 강연자가 허락하면 목소리가 나가요.', 'sys');
+  voiceTick(true);
+}
+function updateMicBtn() {
+  const b = $('aMic'); if (!b) return;
+  b.classList.remove('mic-on', 'mic-wait');
+  if (!voice.micOn) b.innerHTML = '🎙️<span>마이크 켜기</span>';
+  else if (canTalk()) { b.innerHTML = '🎤<span>마이크 끄기</span>'; b.classList.add('mic-on'); }
+  else { b.innerHTML = '⏳<span>발언 대기</span>'; b.classList.add('mic-wait'); }
+}
+// 강연자 화면: 손든 사람 목록과 발언 허락 버튼
+function updateHands() {
+  const show = me.avatar && onStage(me.x, me.z);
+  const list = show ? [...others].filter(([, o]) => inHall(o.tx, o.tz) && !onStage(o.tx, o.tz) && (o.s & (2 | 32))) : [];
+  const key = list.map(([id, o]) => id + (o.s & 32 ? 'g' : 'h')).join(',') + (show ? 1 : 0);
+  if (key === voice.handsKey) return; voice.handsKey = key;
+  const box = $('hands');
+  if (!show) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<h4>🎤 강연자 · 발언 요청</h4>' + (list.length ? '' : '<div style="color:#6b7684">손든 사람이 아직 없어요.</div>') +
+    list.map(([id, o]) => `<div class="row"><span>${o.s & 32 ? '🎤' : '✋'} ${esc(o.nick || '손님')}</span>` +
+      (o.s & 32 ? `<button class="stop" data-id="${id}" data-on="0">그만</button>` : `<button data-id="${id}" data-on="1">허락</button>`) + '</div>').join('');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const on = b.dataset.on === '1', o = others.get(b.dataset.id);
+    channel?.send({ type: 'broadcast', event: 'grant', payload: { to: b.dataset.id, on, by: me.nick } });
+    addLog(on ? `🎤 ${esc(o?.nick || '')} 님에게 발언을 허락했어요.` : `🔇 ${esc(o?.nick || '')} 님의 발언을 마쳤어요.`, 'sys');
+  });
+}
+function onGrant(p) {
+  if (p.on && !inHall(me.x, me.z)) return;
+  voice.granted = !!p.on;
+  if (p.on) {
+    const pz = me.avatar.userData.pose; if (pz.hand) { pz.hand = false; updateActBar(); }
+    addLog(`🎤 ${esc(p.by)} 강연자가 발언을 허락했어요.` + (voice.micOn ? ' 지금 말하면 모두에게 들려요.' : ' 🎙️마이크 켜기를 누르고 말하세요.'), 'sys');
+  } else addLog('🔇 발언 시간이 끝났어요.', 'sys');
+  sendPos(true); voiceTick(true);
+}
+window.agora = { me, voice, peers, others };   // 점검용
+// 휴대폰: 소리가 막혀 있으면 화면을 만질 때 다시 재생
+addEventListener('pointerdown', () => { for (const [, P] of peers) if (P.audio.paused && P.audio.srcObject) P.audio.play().catch(() => {}); }, true);
 
 // ── 동작 버튼 ──
 function shoutBubble(av, text) {
@@ -1195,18 +1353,20 @@ function act(kind) {
     addLog(`<b style="color:#c0392b">📢 ${esc(me.nick)}</b>${esc(t)}`);
     channel?.send({ type: 'broadcast', event: 'shout', payload: { id: myId, n: me.nick, t } });
   }
-  updateActBar(); sendPos(true);
+  updateActBar(); sendPos(true); if (kind === 'hand') voiceTick(true);
 }
 function updateActBar() {
   const pz = me.avatar?.userData.pose || {};
   $('aSit').innerHTML = pz.sit ? '🧍<span>서기</span>' : '🪑<span>앉기</span>';
   $('aHand').innerHTML = pz.hand ? '👇<span>손 내리기</span>' : '✋<span>손들기</span>';
   $('aBook').innerHTML = pz.book === 1 ? '📕<span>책 덮기</span>' : (pz.book === 2 ? '🎒<span>책 넣기</span>' : '📖<span>책 펼치기</span>');
+  updateMicBtn();
   ['aSit', 'aHand', 'aBook'].forEach((id, i) => $(id).classList.toggle('on', [pz.sit, pz.hand, !!pz.book][i]));
 }
-$('aSit').onclick = () => act('sit'); $('aHand').onclick = () => act('hand'); $('aBook').onclick = () => act('book'); $('aShout').onclick = () => act('shout');
+$('aMic').onclick = toggleMic; $('aSit').onclick = () => act('sit'); $('aHand').onclick = () => act('hand'); $('aBook').onclick = () => act('book'); $('aShout').onclick = () => act('shout');
 addEventListener('keydown', e => {
   if (typing || !me.avatar) return;
+  if (e.code === 'Digit5') { toggleMic(); return; }
   const m = { Digit1: 'sit', Digit2: 'hand', Digit3: 'book', Digit4: 'shout' }[e.code]; if (m) act(m);
 });
 
@@ -1382,7 +1542,7 @@ function loop() {
   const T = performance.now() / 1000;
   for (const f of floaters) { f.obj.position.y = f.baseY + Math.sin(T * 0.8) * 0.4; if (f.sway) f.obj.rotation.y = Math.sin(T * 0.3) * 0.1; }
   if (me.avatar) {
-    updateMe(dt); updateCamera(); sendPos(false);
+    updateMe(dt); updateCamera(); sendPos(false); voiceTick(false);
     const panelOpen = !$('vote').classList.contains('hidden') || !$('quiz').classList.contains('hidden');
     const which = nearStele() ? '투표판 열기' : nearBell() ? '골든벨 퀴즈 하기' : '';
     $('hint').classList.toggle('hidden', !which || panelOpen);

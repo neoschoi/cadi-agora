@@ -154,13 +154,44 @@ const stone = mat('#efe9df'), stone2 = mat('#e2d8c8'), marble = mat('#ffffff', {
 // 바닥: 잔디 + 원형 광장
 const grass = new THREE.Mesh(new THREE.CircleGeometry(200, 64), mat('#9cc58a'));
 grass.rotation.x = -Math.PI/2; grass.receiveShadow = true; scene.add(grass);
-const plaza = new THREE.Mesh(new THREE.CircleGeometry(46, 96), stone);
-plaza.rotation.x = -Math.PI/2; plaza.position.y = 0.02; plaza.receiveShadow = true; scene.add(plaza);
-// 바닥 무늬 (동심원)
-for (const r of [8, 26, 36]) {
-  const ring = new THREE.Mesh(new THREE.RingGeometry(r, r+0.35, 96), stone2);
-  ring.rotation.x = -Math.PI/2; ring.position.y = 0.03; scene.add(ring);
+// 광장 바닥 그림: 돌 포장 무늬 + 가운데 별 모자이크 + 남쪽 입구 길 (캔버스 좌표 = 바닥 x,z)
+function plazaTexture() {
+  const S = 2048, R = 46, k = S/2/R;
+  const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  const P = (x, z) => [S/2 + x*k, S/2 + z*k];
+  let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#e9e1d3'; g.fillRect(0, 0, S, S);
+  // 동심원 돌 포장 (고리마다 돌 조각, 색 살짝 다르게)
+  for (let r = 0; r < R; r += 2) {
+    const n = Math.max(6, Math.round(2*Math.PI*(r+1)/2.6));
+    for (let i = 0; i < n; i++) {
+      const a0 = i/n*Math.PI*2 + (r%4 ? 0.5/n*Math.PI*2 : 0), a1 = a0 + Math.PI*2/n;
+      const t = rnd(); g.fillStyle = `hsl(${36 + t*8}, ${18 + t*10}%, ${84 + t*7}%)`;
+      g.beginPath(); g.arc(S/2, S/2, (r+2)*k, a0, a1); g.arc(S/2, S/2, r*k, a1, a0, true); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(120,100,80,.25)'; g.lineWidth = 2; g.stroke();
+    }
+  }
+  // 띠 무늬 (진한 돌)
+  for (const [r, w, col] of [[8,.6,'#b9a284'], [26,.8,'#9fb4c8'], [36,.6,'#b9a284'], [45,1,'#a89274']]) {
+    g.strokeStyle = col; g.lineWidth = w*k; g.beginPath(); g.arc(S/2, S/2, r*k, 0, Math.PI*2); g.stroke();
+  }
+  // 남쪽 입구에서 가운데로 오는 길
+  g.fillStyle = 'rgba(196,160,120,.55)';
+  const [px, pz] = P(-2.5, 7.5); g.fillRect(px, pz, 5*k, 38*k);
+  for (let z = 8; z < 46; z += 2.5) { const [lx, lz] = P(-2.5, z); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(lx, lz, 5*k, 0.15*k); }
+  // 분수대 둘레 8각 별 모자이크
+  const [fx, fz] = P(0, 4);
+  const star = (rOut, rIn, col) => {
+    g.fillStyle = col; g.beginPath();
+    for (let i = 0; i < 16; i++) { const a = i/16*Math.PI*2 - Math.PI/2, rr = (i%2 ? rIn : rOut)*k; g.lineTo(fx + Math.cos(a)*rr, fz + Math.sin(a)*rr); }
+    g.closePath(); g.fill();
+  };
+  star(8.2, 5.2, '#2f6fde'); star(7.2, 4.6, '#f3ead8'); star(6.2, 4, '#c9744a'); star(5, 3.6, '#f3ead8');
+  return new THREE.CanvasTexture(c);
 }
+const ptex = plazaTexture(); ptex.colorSpace = THREE.SRGBColorSpace; ptex.anisotropy = 8;
+const plaza = new THREE.Mesh(new THREE.CircleGeometry(46, 96), new THREE.MeshStandardMaterial({ map: ptex, roughness: .9 }));
+plaza.rotation.x = -Math.PI/2; plaza.position.y = 0.02; plaza.receiveShadow = true; scene.add(plaza);
 
 // 글자 표지판 (스프라이트)
 function label(text, { size=48, bg='rgba(255,255,255,.9)', fg='#1f2a37', scale=1 } = {}) {
@@ -254,6 +285,150 @@ for (let i = 0; i < 26; i++) {
   t.position.set(Math.cos(a)*r, 0, Math.sin(a)*r); scene.add(t);
 }
 
+// ── 광장 채우기: 벤치, 화분 나무, 가로등, 깃발, 꽃밭 ──
+const wood = mat('#a8774f'), metal = mat('#3d4650', { roughness:.5, metalness:.4 });
+function bench(x, z, face) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 0.7), wood); seat.position.y = 0.5;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 0.1), wood); back.position.set(0, 0.85, -0.32);
+  for (const sx of [-1.1, 1.1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.6), metal); l.position.set(sx, 0.25, 0); g.add(l); }
+  g.add(seat, back); g.children.forEach(m => m.castShadow = true);
+  g.position.set(x, 0, z); g.rotation.y = face; scene.add(g);
+}
+function planter(x, z, big) {
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.2, 0.8, 24), stone2); pot.position.y = 0.4;
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(1.3, 24), mat('#6b4f3a')); soil.rotation.x = -Math.PI/2; soil.position.y = 0.81;
+  g.add(pot, soil);
+  if (big) {
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 2.2, 8), mat('#7a5a3a')); tr.position.y = 1.9;
+    const top = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), mat('#6aa660')); top.position.y = 3.6;
+    g.add(tr, top);
+  } else {
+    const cols = ['#e2574c','#f2c94c','#e06aa8','#ffffff','#8a5cd6'];
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random()*Math.PI*2, r = Math.random()*1.0;
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat(cols[i%cols.length]));
+      f.position.set(Math.cos(a)*r, 1 + Math.random()*0.25, Math.sin(a)*r); g.add(f);
+    }
+    const bush = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), mat('#5f9b57')); bush.position.y = 0.9; bush.scale.y = 0.6; g.add(bush);
+  }
+  g.children.forEach(m => m.castShadow = true);
+  g.position.set(x, 0, z); scene.add(g);
+}
+const lampHeads = [];
+function lamp(x, z) {
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 4.2, 8), metal); pole.position.set(x, 2.1, z); pole.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), mat('#fff6d8', { emissive:'#ffe7a3', emissiveIntensity: .8 }));
+  head.position.set(x, 4.4, z); scene.add(pole, head); lampHeads.push(head);
+}
+// 벤치: 분수대 둘레와 길 양옆
+for (let i = 0; i < 8; i++) {
+  const a = i/8*Math.PI*2 + Math.PI/8; if (Math.abs(Math.sin(a) - 1) < 0.2) continue;
+  bench(Math.cos(a)*11, 4 + Math.sin(a)*11, Math.atan2(-Math.cos(a), -Math.sin(a)));
+}
+// 화분(나무·꽃) 고리: 반지름 31, 입구 길과 투표판·정자 자리는 비움
+for (let i = 0; i < 16; i++) {
+  const a = i/16*Math.PI*2; const x = Math.cos(a)*31, z = Math.sin(a)*31;
+  if (Math.abs(x) < 4 && z > 0) continue;
+  planter(x, z, i % 2 === 0);
+}
+// 가로등: 반지름 21과 38
+for (let i = 0; i < 12; i++) { const a = i/12*Math.PI*2 + 0.26; lamp(Math.cos(a)*38, Math.sin(a)*38); }
+for (let i = 0; i < 6; i++) { const a = i/6*Math.PI*2 + 0.52; const x = Math.cos(a)*21, z = Math.sin(a)*21; if (Math.abs(x) > 3) lamp(x, z); }
+// 기둥에 매단 연구소 깃발 (파랑·주황 번갈아)
+for (let i = 0; i < 40; i += 4) {
+  const a = i/40*Math.PI*2; if (Math.abs(a - Math.PI/2) < 0.4) continue;
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 3.4), mat(i % 8 ? '#c9744a' : '#2f6fde', { side: THREE.DoubleSide }));
+  flag.position.set(Math.cos(a)*42.2, 4.6, Math.sin(a)*42.2); flag.lookAt(0, 4.6, 0); scene.add(flag);
+}
+// 바깥 잔디의 꽃밭
+{
+  const cols = ['#e2574c','#f2c94c','#e06aa8','#ffffff','#8a5cd6','#f2a93b'];
+  const geo = new THREE.SphereGeometry(0.22, 6, 5);
+  for (let b = 0; b < 14; b++) {
+    const a = b/14*Math.PI*2 + 0.2, r = 49 + (b%2)*4; const cx = Math.cos(a)*r, cz = Math.sin(a)*r;
+    const m = mat(cols[b%cols.length]);
+    const inst = new THREE.InstancedMesh(geo, m, 40); const d = new THREE.Object3D();
+    for (let i = 0; i < 40; i++) { d.position.set(cx + (Math.random()-.5)*5, 0.2, cz + (Math.random()-.5)*3); d.updateMatrix(); inst.setMatrixAt(i, d.matrix); }
+    scene.add(inst);
+  }
+  // 입구 바깥 길
+  const path = new THREE.Mesh(new THREE.PlaneGeometry(5, 40), mat('#d9c7a8'));
+  path.rotation.x = -Math.PI/2; path.position.set(0, 0.015, 65); path.receiveShadow = true; scene.add(path);
+}
+
+// ── 하늘에 떠 있는 연구소 로고판 (logo.png = 홈페이지 로고) ──
+const floaters = [];
+function panelMesh(canvas, width) {
+  const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const h = width * canvas.height / canvas.width;
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide }));
+}
+// 그림을 그린 캔버스를 3D에 쓸 수 있는지 확인 (파일로 직접 열면 보안상 막힐 수 있음)
+function usable(c) { try { c.getContext('2d').getImageData(0, 0, 1, 1); return true; } catch { return false; } }
+function roundPanel(w, h, r, fill) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = fill; g.beginPath(); g.roundRect(0, 0, w, h, r); g.fill(); return [c, g];
+}
+const logoGroup = new THREE.Group(); logoGroup.position.set(0, 12, -18); scene.add(logoGroup);
+floaters.push({ obj: logoGroup, baseY: 12, sway: true });
+function drawLogoBoard(img) {
+  const [c, g] = roundPanel(2048, 560, 80, 'rgba(255,255,255,.96)');
+  g.strokeStyle = '#12224a'; g.lineWidth = 14; g.beginPath(); g.roundRect(7, 7, 2034, 546, 74); g.stroke();
+  if (img) {
+    g.imageSmoothingQuality = 'high';
+    const s = Math.min(1840 / img.width, 400 / img.height);
+    g.drawImage(img, 1024 - img.width*s/2, 280 - img.height*s/2, img.width*s, img.height*s);
+  } else {
+    g.fillStyle = '#12224a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 190px sans-serif'; g.fillText('(사)자치분권연구소', 1024, 280);
+  }
+  if (img && !usable(c)) return drawLogoBoard(null);
+  logoGroup.clear(); logoGroup.add(panelMesh(c, 16));
+}
+drawLogoBoard(null);
+{ const im = new Image(); im.onload = () => drawLogoBoard(im); im.src = 'logo.png'; }
+
+// ── 개정증보판 책 광고판 (함께 읽기 정자 옆, 떠 있음) ──
+const bookGroup = new THREE.Group(); bookGroup.position.set(-27, 6.5, 9); bookGroup.lookAt(0, 6.5, 4); scene.add(bookGroup);
+floaters.push({ obj: bookGroup, baseY: 6.5 });
+function drawBookBoard(cover) {
+  const [c, g] = roundPanel(2048, 1280, 70, '#12224a');
+  // 표지 (book-cover.jpg가 있으면 그 그림, 없으면 그려 넣은 표지)
+  const bx = 110, by = 150, bw = 680, bh = 980;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(bx + 24, by + 24, bw, bh);
+  if (cover) { g.drawImage(cover, bx, by, bw, bh); }
+  else {
+    const gr = g.createLinearGradient(bx, by, bx, by + bh); gr.addColorStop(0, '#fdeed9'); gr.addColorStop(1, '#f0a548');
+    g.fillStyle = gr; g.fillRect(bx, by, bw, bh);
+    g.fillStyle = '#12224a'; g.fillRect(bx, by + 90, bw, 16); g.fillRect(bx, by + bh - 150, bw, 8);
+    g.textAlign = 'center'; g.fillStyle = '#12224a';
+    g.font = 'bold 92px sans-serif'; g.fillText('주민자치,', bx + bw/2, by + 300);
+    g.font = 'bold 74px sans-serif'; g.fillText('그 길을', bx + bw/2, by + 420); g.fillText('묻고 답하다', bx + bw/2, by + 510);
+    g.fillStyle = '#c76a12'; g.font = 'bold 54px sans-serif'; g.fillText('개정증보판', bx + bw/2, by + 650);
+    g.fillStyle = '#12224a'; g.font = '40px sans-serif'; g.fillText('(사)자치분권연구소', bx + bw/2, by + bh - 70);
+  }
+  // 오른쪽 글
+  const tx = 900; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = '#f0a548'; g.beginPath(); g.roundRect(tx, 170, 420, 96, 48); g.fill();
+  g.fillStyle = '#12224a'; g.font = 'bold 58px sans-serif'; g.fillText('신간 · 개정증보판', tx + 30, 238);
+  g.fillStyle = '#ffffff'; g.font = 'bold 104px sans-serif';
+  g.fillText('주민자치,', tx, 430); g.fillText('그 길을 묻고 답하다', tx, 560);
+  g.fillStyle = '#cdd5e7'; g.font = '54px sans-serif';
+  g.fillText('주민자치 2.0을 위한 현장 길라잡이', tx, 690);
+  g.font = '44px sans-serif'; g.fillStyle = '#a9b6d3';
+  g.fillText('· 지방자치법 제17조의2 신설 내용 반영', tx, 800);
+  g.fillText('· 행안부 주민자치회 참고조례 해설', tx, 870);
+  g.fillText('· 주민·주민자치위원·공무원을 위한 매뉴얼', tx, 940);
+  g.fillStyle = '#f0a548'; g.font = 'bold 50px sans-serif';
+  g.fillText('함께 읽기 정자에서 같이 읽어요', tx, 1080);
+  if (cover && !usable(c)) return drawBookBoard(null);
+  bookGroup.clear(); bookGroup.add(panelMesh(c, 11));
+}
+drawBookBoard(null);
+{ const im = new Image(); im.onload = () => drawBookBoard(im); im.src = 'book-cover.jpg'; }
+
 // ── 아바타 ──
 function makeAvatar(nick, color) {
   const g = new THREE.Group();
@@ -278,7 +453,7 @@ function say(av, text) {
 
 // ── 이동 / 카메라 ──
 const me = { x: 0, z: 28, ry: Math.PI, nick: '', color: myColor, avatar: null };
-let camYaw = 0, camPitch = 0.35;
+let camYaw = 0, camPitch = 0.22;
 const keys = {};
 let joy = { x: 0, y: 0 };
 let typing = false;
@@ -512,6 +687,8 @@ $('voteClose').onclick = () => $('vote').classList.add('hidden');
 const clock = new THREE.Clock();
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
+  const T = performance.now() / 1000;
+  for (const f of floaters) { f.obj.position.y = f.baseY + Math.sin(T * 0.8) * 0.4; if (f.sway) f.obj.rotation.y = Math.sin(T * 0.3) * 0.25; }
   if (me.avatar) {
     updateMe(dt); updateCamera(); sendPos(false);
     $('hint').classList.toggle('hidden', !nearStele() || !$('vote').classList.contains('hidden'));

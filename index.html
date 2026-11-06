@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>자치분권 아고라</title>
+<style>
+  :root { --ink:#1f2a37; --accent:#2f6fde; --paper:#fbf8f2; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif; color:var(--ink); background:#cfe3f2; }
+  canvas { display:block; touch-action:none; }
+  .hidden { display:none !important; }
+
+  /* 입장 화면 */
+  #enter { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(160deg,#e9f1fa,#f7efe2); z-index:20; padding:16px; }
+  #enter .card { background:#fff; border-radius:18px; padding:28px; width:100%; max-width:380px; box-shadow:0 10px 40px rgba(0,0,0,.12); }
+  #enter h1 { margin:0 0 6px; font-size:26px; }
+  #enter p { margin:0 0 18px; color:#5b6572; font-size:14px; line-height:1.5; }
+  #enter input { width:100%; font-size:17px; padding:12px; border:1px solid #cdd5df; border-radius:10px; }
+  .colors { display:flex; gap:10px; margin:14px 0 20px; flex-wrap:wrap; }
+  .colors button { width:34px; height:34px; border-radius:50%; border:3px solid transparent; cursor:pointer; }
+  .colors button.on { border-color:var(--ink); }
+  .btn { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:12px 18px; font-size:16px; cursor:pointer; }
+  #enterBtn { width:100%; }
+
+  /* 상단 바 */
+  #top { position:fixed; top:10px; left:10px; right:10px; display:flex; gap:8px; align-items:center; z-index:5; pointer-events:none; }
+  #top > * { pointer-events:auto; }
+  .pill { background:rgba(255,255,255,.9); border-radius:999px; padding:8px 14px; font-size:14px; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  #voteOpen { margin-left:auto; }
+
+  /* 채팅 */
+  #chat { position:fixed; right:10px; bottom:10px; width:340px; max-width:calc(100vw - 20px); z-index:5; display:flex; flex-direction:column; gap:6px; }
+  #log { max-height:32vh; overflow-y:auto; background:rgba(255,255,255,.85); border-radius:12px; padding:8px 10px; font-size:14px; line-height:1.45; }
+  #log .m b { margin-right:6px; }
+  #log .sys { color:#7a8490; font-size:12px; }
+  #chatForm { display:flex; gap:6px; }
+  #chatInput { flex:1; min-width:0; font-size:16px; padding:10px; border-radius:10px; border:1px solid #cdd5df; }
+
+  /* 투표 패널 */
+  #vote { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(420px, calc(100vw - 32px)); max-height:80vh; overflow-y:auto; background:var(--paper); border-radius:16px; padding:20px; z-index:10; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  #vote h2 { margin:0 0 12px; font-size:19px; }
+  .agenda { margin-bottom:18px; }
+  .agenda h3 { font-size:16px; margin:0 0 10px; }
+  .opt { display:block; width:100%; text-align:left; background:#fff; border:1px solid #d7dde5; border-radius:10px; padding:10px 12px; margin-bottom:6px; cursor:pointer; position:relative; overflow:hidden; font-size:15px; }
+  .opt .bar { position:absolute; left:0; top:0; bottom:0; background:rgba(47,111,222,.15); z-index:0; transition:width .4s; }
+  .opt span { position:relative; z-index:1; }
+  .opt.mine { border-color:var(--accent); font-weight:bold; }
+  #voteClose { background:#8a94a3; }
+
+  #hint { position:fixed; left:50%; bottom:90px; transform:translateX(-50%); z-index:6; }
+  #help { position:fixed; left:10px; bottom:10px; font-size:12px; color:#3b4652; background:rgba(255,255,255,.75); padding:6px 10px; border-radius:8px; z-index:4; }
+
+  /* 모바일 조이스틱 */
+  #joy { position:fixed; left:20px; bottom:20px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.35); border:2px solid rgba(255,255,255,.7); z-index:6; touch-action:none; }
+  #joyKnob { position:absolute; left:40px; top:40px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.9); }
+  @media (max-width: 700px) {
+    #chat { width:calc(100vw - 160px); }
+    #log { max-height:22vh; font-size:13px; }
+    #help { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="enter">
+  <div class="card">
+    <h1>자치분권 아고라</h1>
+    <p>누구나 들어와 이야기하는 광장입니다.<br>광장에서 쓸 이름과 색을 고르세요.</p>
+    <input id="nick" maxlength="12" placeholder="이름 (예: 홍길동)" autocomplete="off">
+    <div class="colors" id="colors"></div>
+    <button class="btn" id="enterBtn">광장 입장</button>
+  </div>
+</div>
+
+<div id="top" class="hidden">
+  <div class="pill" id="online">접속 0명</div>
+  <button class="btn pill" id="voteOpen" style="color:#fff;background:var(--accent)">안건 투표</button>
+</div>
+
+<div id="chat" class="hidden">
+  <div id="log"></div>
+  <form id="chatForm" autocomplete="off">
+    <input id="chatInput" maxlength="300" placeholder="말하기 (Enter)">
+    <button class="btn" type="submit">보내기</button>
+  </form>
+</div>
+
+<div id="vote" class="hidden">
+  <h2>광장 안건 투표</h2>
+  <div id="agendas">불러오는 중…</div>
+  <button class="btn" id="voteClose">닫기</button>
+</div>
+
+<button class="btn hidden" id="hint">투표판 열기</button>
+<div id="help" class="hidden">이동: W A S D / 방향키 · 시점: 마우스 끌기 · 대화: Enter</div>
+<div id="joy" class="hidden"><div id="joyKnob"></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { createClient } from '@supabase/supabase-js';
+
+// ── 설정 (공개용 키: 브라우저에 넣어도 되는 키) ──
+const SUPABASE_URL = 'https://ijrxgxrkypesxcszzswr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yuvog0izANgh9rw3Hc2eoA_enPgXoGK';
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = ['#e2574c','#f2a93b','#4caf7a','#2f6fde','#8a5cd6','#e06aa8','#3fb7c4','#6b4f3a'];
+const $ = (id) => document.getElementById(id);
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
+// 내 고유번호 (투표 중복 방지용, 이 브라우저에 저장)
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } }
+let myId = store('agora_id');
+if (!myId) { myId = crypto.randomUUID(); store('agora_id', myId); }
+let myColor = store('agora_color') || COLORS[Math.floor(Math.random()*COLORS.length)];
+$('nick').value = store('agora_nick') || '';
+
+COLORS.forEach(c => {
+  const b = document.createElement('button');
+  b.style.background = c; if (c === myColor) b.className = 'on';
+  b.onclick = () => { myColor = c; [...$('colors').children].forEach(x => x.className = ''); b.className = 'on'; };
+  $('colors').appendChild(b);
+});
+
+// ── 3D 장면 ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3f2');
+scene.fog = new THREE.Fog('#cfe3f2', 70, 160);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 400);
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#b9a98f', 0.9));
+const sun = new THREE.DirectionalLight('#fff4e0', 1.6);
+sun.position.set(30, 50, 20); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left:-60, right:60, top:60, bottom:-60, far:150 });
+scene.add(sun);
+
+const mat = (color, extra={}) => new THREE.MeshStandardMaterial({ color, roughness:.8, ...extra });
+const stone = mat('#efe9df'), stone2 = mat('#e2d8c8'), marble = mat('#ffffff', { roughness:.4 });
+
+// 바닥: 잔디 + 원형 광장
+const grass = new THREE.Mesh(new THREE.CircleGeometry(200, 64), mat('#9cc58a'));
+grass.rotation.x = -Math.PI/2; grass.receiveShadow = true; scene.add(grass);
+const plaza = new THREE.Mesh(new THREE.CircleGeometry(46, 96), stone);
+plaza.rotation.x = -Math.PI/2; plaza.position.y = 0.02; plaza.receiveShadow = true; scene.add(plaza);
+// 바닥 무늬 (동심원)
+for (const r of [8, 26, 36]) {
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r, r+0.35, 96), stone2);
+  ring.rotation.x = -Math.PI/2; ring.position.y = 0.03; scene.add(ring);
+}
+
+// 글자 표지판 (스프라이트)
+function label(text, { size=48, bg='rgba(255,255,255,.9)', fg='#1f2a37', scale=1 } = {}) {
+  const c = document.createElement('canvas'); const g = c.getContext('2d');
+  g.font = `bold ${size}px sans-serif`;
+  const w = Math.ceil(g.measureText(text).width) + size; const h = size * 1.6;
+  c.width = w; c.height = h;
+  g.font = `bold ${size}px sans-serif`;
+  g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, w, h, h/2); g.fill();
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w/2, h/2 + 2);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  s.scale.set(w/h * 0.6 * scale, 0.6 * scale, 1); s.renderOrder = 10;
+  return s;
+}
+
+// 원형 열주(스토아): 하얀 기둥 + 떠 있는 지붕 고리, 남쪽은 입구로 열어둠
+const colGeo = new THREE.CylinderGeometry(0.55, 0.65, 7, 20);
+const N = 40;
+for (let i = 0; i < N; i++) {
+  const a = i / N * Math.PI * 2;
+  if (Math.abs(a - Math.PI/2) < 0.25) continue; // 입구(남쪽)
+  const col = new THREE.Mesh(colGeo, marble);
+  col.position.set(Math.cos(a)*43, 3.5, Math.sin(a)*43); col.castShadow = true; scene.add(col);
+}
+{
+  const shape = new THREE.Shape(); shape.absarc(0, 0, 45, 0, Math.PI*2, false);
+  const hole = new THREE.Path(); hole.absarc(0, 0, 41, 0, Math.PI*2, true); shape.holes.push(hole);
+  const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.6, bevelEnabled: false, curveSegments: 96 }), marble);
+  roof.rotation.x = -Math.PI/2; roof.position.y = 7; roof.castShadow = true; scene.add(roof);
+}
+
+// 연단(베마)과 계단식 객석 — 북쪽
+const BEMA = new THREE.Vector3(0, 0, -14);
+{
+  const bema = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.8, 48), marble);
+  bema.position.set(BEMA.x, 0.4, BEMA.z); bema.castShadow = bema.receiveShadow = true; scene.add(bema);
+  const lec = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.6), mat('#b98b5e'));
+  lec.position.set(BEMA.x, 1.4, BEMA.z + 1.2); scene.add(lec);
+  const l = label('연단 · 토론회'); l.position.set(BEMA.x, 4, BEMA.z); scene.add(l);
+  // 객석: 연단 뒤쪽 반원, 5단
+  for (let i = 0; i < 5; i++) {
+    const r0 = 7 + i*2.2, r1 = r0 + 2.2;
+    const sh = new THREE.Shape();
+    const a0 = Math.PI*0.12, a1 = Math.PI*0.88;
+    sh.absarc(0, 0, r1, a0, a1, false); sh.absarc(0, 0, r0, a1, a0, true);
+    const step = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.45*(i+1), bevelEnabled:false, curveSegments: 48 }), i%2 ? stone : stone2);
+    step.rotation.x = -Math.PI/2; step.position.set(BEMA.x, 0, BEMA.z);
+    // Shape의 y(+)가 회전 후 북쪽(-z)이 되므로 객석은 연단 뒤쪽 반원에 놓임
+    step.castShadow = step.receiveShadow = true; scene.add(step);
+  }
+}
+
+// 가운데 물웅덩이(분수대)
+{
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(3, 0.3, 12, 48), marble);
+  rim.rotation.x = Math.PI/2; rim.position.set(0, 0.3, 4); scene.add(rim);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(3, 48), mat('#7cc3e8', { roughness:.1, metalness:.2 }));
+  water.rotation.x = -Math.PI/2; water.position.set(0, 0.25, 4); scene.add(water);
+}
+
+// 투표 비석(스텔레) — 동쪽
+const STELE = new THREE.Vector3(18, 0, 6);
+{
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3, 0.5, 1.6), stone2); base.position.set(STELE.x, 0.25, STELE.z); scene.add(base);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.6, 0.4), mat('#2f6fde', { emissive:'#1b3f86', emissiveIntensity:.35 }));
+  board.position.set(STELE.x, 2.3, STELE.z); board.rotation.y = -Math.PI/3; board.castShadow = true; scene.add(board);
+  const l = label('안건 투표판'); l.position.set(STELE.x, 4.8, STELE.z); scene.add(l);
+}
+
+// 함께 읽기 정자 — 서쪽 (준비중)
+const BOOK = new THREE.Vector3(-18, 0, 6);
+{
+  for (let i = 0; i < 6; i++) {
+    const a = i/6*Math.PI*2;
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.2, 10), marble);
+    c.position.set(BOOK.x + Math.cos(a)*3, 1.6, BOOK.z + Math.sin(a)*3); c.castShadow = true; scene.add(c);
+  }
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(4, 1.6, 6), mat('#c9744a'));
+  roof.position.set(BOOK.x, 4, BOOK.z); roof.castShadow = true; scene.add(roof);
+  const l = label('함께 읽기 (준비중)'); l.position.set(BOOK.x, 5.6, BOOK.z); scene.add(l);
+}
+
+// 나무 (광장 바깥)
+for (let i = 0; i < 26; i++) {
+  const a = i/26*Math.PI*2 + 0.1, r = 52 + (i%3)*5;
+  const t = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2.4, 8), mat('#7a5a3a')); trunk.position.y = 1.2;
+  const top = new THREE.Mesh(new THREE.SphereGeometry(2 + (i%2), 12, 10), mat('#5f9b57')); top.position.y = 3.6;
+  trunk.castShadow = top.castShadow = true; t.add(trunk, top);
+  t.position.set(Math.cos(a)*r, 0, Math.sin(a)*r); scene.add(t);
+}
+
+// ── 아바타 ──
+function makeAvatar(nick, color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.9, 6, 14), mat(color));
+  body.position.y = 0.95; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 12), mat('#f3d9bf'));
+  head.position.y = 2.05; head.castShadow = true;
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), mat('#e0b896'));
+  nose.position.set(0, 2.05, 0.37); // 바라보는 방향 표시
+  const name = label(nick, { size: 40, scale: 0.9 }); name.position.y = 2.8;
+  g.add(body, head, nose, name);
+  g.userData = { name, bubble: null, bubbleTimer: 0 };
+  scene.add(g);
+  return g;
+}
+function say(av, text) {
+  if (av.userData.bubble) av.remove(av.userData.bubble);
+  const t = text.length > 24 ? text.slice(0, 23) + '…' : text;
+  const b = label(t, { size: 40, bg:'rgba(255,253,235,.97)', scale: 1 }); b.position.y = 3.5;
+  av.add(b); av.userData.bubble = b; av.userData.bubbleTimer = 6;
+}
+
+// ── 이동 / 카메라 ──
+const me = { x: 0, z: 28, ry: Math.PI, nick: '', color: myColor, avatar: null };
+let camYaw = 0, camPitch = 0.35;
+const keys = {};
+let joy = { x: 0, y: 0 };
+let typing = false;
+
+addEventListener('keydown', e => {
+  if (typing) return;
+  keys[e.code] = true;
+  if (e.code === 'Enter' && me.avatar) { e.preventDefault(); $('chatInput').focus(); }
+  if (e.code === 'KeyE' && nearStele()) openVote();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+// 마우스/손가락 끌어서 시점 돌리기
+let drag = null;
+renderer.domElement.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  camYaw -= (e.clientX - drag.x) * 0.006;
+  camPitch = Math.min(1.2, Math.max(0.08, camPitch + (e.clientY - drag.y) * 0.004));
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+addEventListener('pointerup', e => { if (drag && e.pointerId === drag.id) drag = null; });
+
+// 조이스틱
+{
+  const pad = $('joy'), knob = $('joyKnob'); let pid = null;
+  const move = (e) => {
+    const r = pad.getBoundingClientRect();
+    let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+    const d = Math.hypot(dx, dy), max = 45; if (d > max) { dx *= max/d; dy *= max/d; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`; joy = { x: dx/max, y: dy/max };
+  };
+  pad.addEventListener('pointerdown', e => { e.stopPropagation(); pid = e.pointerId; pad.setPointerCapture(pid); move(e); });
+  pad.addEventListener('pointermove', e => { if (e.pointerId === pid) move(e); });
+  const end = () => { pid = null; joy = { x: 0, y: 0 }; knob.style.transform = ''; };
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+}
+
+const nearStele = () => Math.hypot(me.x - STELE.x, me.z - STELE.z) < 5;
+
+function updateMe(dt) {
+  let f = 0, s = 0;
+  if (!typing) {
+    if (keys.KeyW || keys.ArrowUp) f += 1;
+    if (keys.KeyS || keys.ArrowDown) f -= 1;
+    if (keys.KeyA || keys.ArrowLeft) s -= 1;
+    if (keys.KeyD || keys.ArrowRight) s += 1;
+  }
+  f -= joy.y; s += joy.x;
+  const len = Math.hypot(f, s);
+  if (len > 0.05) {
+    const speed = (keys.ShiftLeft ? 9 : 5.5) * Math.min(1, len);
+    // 카메라가 바라보는 방향 기준으로 이동
+    const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
+    const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    let dx = (fx*f + rx*s)/len, dz = (fz*f + rz*s)/len;
+    me.x += dx * speed * dt; me.z += dz * speed * dt;
+    me.ry = Math.atan2(dx, dz);
+    // 광장 밖으로 너무 멀리 못 가게
+    const d = Math.hypot(me.x, me.z); if (d > 75) { me.x *= 75/d; me.z *= 75/d; }
+  }
+  // 객석 위에 서면 높이 올라가기
+  const bx = me.x - BEMA.x, bz = me.z - BEMA.z, br = Math.hypot(bx, bz);
+  let y = 0;
+  if (br < 3.3) y = 0.8;
+  else {
+    const ang = Math.atan2(bz, bx); // 북쪽(-z)이 음수 각
+    const inArc = ang < -Math.PI*0.12 && ang > -Math.PI*0.88;
+    if (inArc && br >= 7 && br < 18) y = 0.45 * (Math.floor((br - 7)/2.2) + 1);
+  }
+  const av = me.avatar;
+  av.position.x = me.x; av.position.z = me.z;
+  av.position.y += (y - av.position.y) * Math.min(1, dt*12);
+  av.rotation.y = me.ry;
+}
+
+function updateCamera() {
+  const dist = 10, h = Math.sin(camPitch) * dist, back = Math.cos(camPitch) * dist;
+  const target = new THREE.Vector3(me.x, me.avatar.position.y + 1.8, me.z);
+  camera.position.set(target.x + Math.sin(camYaw)*back, target.y + h, target.z + Math.cos(camYaw)*back);
+  camera.lookAt(target);
+}
+
+// ── 실시간 접속 (Supabase Realtime) ──
+const others = new Map(); // id -> { avatar, tx, tz, ry, seen }
+let channel = null;
+
+function ensureOther(id, nick, color) {
+  let o = others.get(id);
+  if (!o) {
+    o = { avatar: makeAvatar(nick || '손님', color || '#999'), tx: 0, tz: 0, ty: 0, ry: 0, seen: performance.now(), nick };
+    others.set(id, o);
+  }
+  return o;
+}
+function removeOther(id) {
+  const o = others.get(id); if (!o) return;
+  scene.remove(o.avatar); others.delete(id);
+}
+
+function addLog(html, cls='m') {
+  const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  $('log').appendChild(d); $('log').scrollTop = $('log').scrollHeight;
+  while ($('log').children.length > 80) $('log').firstChild.remove();
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function join() {
+  const nick = $('nick').value.trim().slice(0, 12);
+  if (!nick) { $('nick').focus(); return; }
+  me.nick = nick; me.color = myColor;
+  store('agora_nick', nick); store('agora_color', myColor);
+  me.x = (Math.random()-0.5)*8; me.z = 28 + Math.random()*4;
+  me.avatar = makeAvatar(nick, myColor);
+
+  $('enter').classList.add('hidden');
+  ['top','chat'].forEach(id => $(id).classList.remove('hidden'));
+  if (isTouch) $('joy').classList.remove('hidden'); else $('help').classList.remove('hidden');
+
+  // 지난 대화 30개 불러오기
+  const { data: past } = await sb.from('messages').select('nickname, body, created_at').order('created_at', { ascending: false }).limit(30);
+  (past || []).reverse().forEach(m => addLog(`<b>${esc(m.nickname)}</b>${esc(m.body)}`));
+  addLog('광장에 들어왔습니다. 남쪽 입구에서 연단을 바라보고 있어요.', 'sys');
+
+  channel = sb.channel('agora-main', { config: { presence: { key: myId }, broadcast: { self: false } } });
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const st = channel.presenceState();
+      $('online').textContent = `접속 ${Object.keys(st).length}명`;
+      for (const id of [...others.keys()]) if (!st[id]) removeOther(id);
+      for (const [id, metas] of Object.entries(st)) {
+        if (id === myId) continue; const m = metas[0];
+        const o = ensureOther(id, m.nick, m.color);
+        if (!o.placed) { o.tx = m.x ?? 0; o.tz = m.z ?? 30; o.avatar.position.set(o.tx, 0, o.tz); o.placed = true; }
+      }
+    })
+    .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      if (key !== myId) addLog(`${esc(newPresences[0]?.nick || '손님')} 님이 들어왔습니다.`, 'sys');
+    })
+    .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      if (key !== myId) addLog(`${esc(leftPresences[0]?.nick || '손님')} 님이 나갔습니다.`, 'sys');
+    })
+    .on('broadcast', { event: 'pos' }, ({ payload: p }) => {
+      const o = ensureOther(p.id, p.n, p.c);
+      o.tx = p.x; o.tz = p.z; o.ty = p.y; o.ry = p.r; o.seen = performance.now(); o.placed = true;
+    })
+    .on('broadcast', { event: 'chat' }, ({ payload: p }) => {
+      addLog(`<b>${esc(p.n)}</b>${esc(p.t)}`);
+      const o = others.get(p.id); if (o) say(o.avatar, p.t);
+    })
+    .on('broadcast', { event: 'voted' }, () => { if (!$('vote').classList.contains('hidden')) loadAgendas(); })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ nick: me.nick, color: me.color, x: me.x, z: me.z });
+        sendPos(true);
+      }
+    });
+}
+$('enterBtn').onclick = join;
+$('nick').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+
+let lastSent = 0, lastKey = '';
+function sendPos(force) {
+  if (!channel) return;
+  const now = performance.now();
+  if (!force && now - lastSent < 150) return; // 1초에 약 6~7번
+  const p = { id: myId, n: me.nick, c: me.color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), y: +me.avatar.position.y.toFixed(2), r: +me.ry.toFixed(2) };
+  const k = `${p.x},${p.z},${p.r}`;
+  if (!force && k === lastKey && now - lastSent < 3000) return; // 가만히 있으면 3초에 한 번만
+  lastKey = k; lastSent = now;
+  channel.send({ type: 'broadcast', event: 'pos', payload: p });
+}
+
+// ── 채팅 ──
+$('chatInput').addEventListener('focus', () => { typing = true; Object.keys(keys).forEach(k => keys[k] = false); });
+$('chatInput').addEventListener('blur', () => { typing = false; });
+$('chatForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const t = $('chatInput').value.trim().slice(0, 300);
+  if (!t) { $('chatInput').blur(); return; }
+  $('chatInput').value = '';
+  addLog(`<b>${esc(me.nick)}</b>${esc(t)}`);
+  say(me.avatar, t);
+  channel?.send({ type: 'broadcast', event: 'chat', payload: { id: myId, n: me.nick, t } });
+  sb.from('messages').insert({ nickname: me.nick, body: t }).then(({ error }) => { if (error) console.warn(error); });
+  if (isTouch) $('chatInput').blur();
+});
+
+// ── 투표 ──
+async function loadAgendas() {
+  const [{ data: agendas, error }, { data: votes }] = await Promise.all([
+    sb.from('agendas').select('*').eq('is_open', true).order('id'),
+    sb.from('votes').select('agenda_id, voter, choice'),
+  ]);
+  const box = $('agendas');
+  if (error) { box.textContent = '안건을 불러오지 못했습니다.'; return; }
+  if (!agendas?.length) { box.textContent = '지금 진행 중인 안건이 없습니다.'; return; }
+  box.innerHTML = '';
+  for (const a of agendas) {
+    const vs = (votes || []).filter(v => v.agenda_id === a.id);
+    const mine = vs.find(v => v.voter === myId)?.choice;
+    const div = document.createElement('div'); div.className = 'agenda';
+    div.innerHTML = `<h3>${esc(a.title)}</h3>`;
+    for (const opt of a.options) {
+      const n = vs.filter(v => v.choice === opt).length;
+      const pct = vs.length ? Math.round(n / vs.length * 100) : 0;
+      const b = document.createElement('button'); b.className = 'opt' + (mine === opt ? ' mine' : '');
+      b.innerHTML = `<div class="bar" style="width:${pct}%"></div><span>${esc(opt)} — ${n}표 (${pct}%)${mine === opt ? ' ✓ 내 선택' : ''}</span>`;
+      b.onclick = () => castVote(a.id, opt);
+      div.appendChild(b);
+    }
+    const foot = document.createElement('div'); foot.className = 'sys'; foot.style.fontSize = '12px'; foot.style.color = '#7a8490';
+    foot.textContent = `총 ${vs.length}명 참여 · 다시 누르면 선택을 바꿀 수 있어요`;
+    div.appendChild(foot);
+    box.appendChild(div);
+  }
+}
+async function castVote(agendaId, choice) {
+  const { error } = await sb.from('votes').upsert({ agenda_id: agendaId, voter: myId, choice }, { onConflict: 'agenda_id,voter' });
+  if (error) { alert('투표에 실패했습니다: ' + error.message); return; }
+  await loadAgendas();
+  channel?.send({ type: 'broadcast', event: 'voted', payload: {} });
+  addLog(`${esc(me.nick)} 님이 투표했습니다.`, 'sys');
+}
+function openVote() { $('vote').classList.remove('hidden'); loadAgendas(); }
+$('voteOpen').onclick = openVote;
+$('hint').onclick = openVote;
+$('voteClose').onclick = () => $('vote').classList.add('hidden');
+
+// ── 반복 그리기 ──
+const clock = new THREE.Clock();
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (me.avatar) {
+    updateMe(dt); updateCamera(); sendPos(false);
+    $('hint').classList.toggle('hidden', !nearStele() || !$('vote').classList.contains('hidden'));
+    $('hint').textContent = isTouch ? '투표판 열기' : '투표판 열기 (E)';
+    for (const [id, o] of others) {
+      const a = o.avatar, k = Math.min(1, dt * 10);
+      a.position.x += (o.tx - a.position.x) * k;
+      a.position.z += (o.tz - a.position.z) * k;
+      a.position.y += ((o.ty || 0) - a.position.y) * k;
+      let dr = o.ry - a.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); a.rotation.y += dr * k;
+    }
+    for (const a of [me.avatar, ...[...others.values()].map(o => o.avatar)]) {
+      const u = a.userData; if (u.bubble && (u.bubbleTimer -= dt) <= 0) { a.remove(u.bubble); u.bubble = null; }
+    }
+  } else {
+    // 입장 전: 광장을 천천히 둘러보기
+    const t = performance.now() * 0.00005;
+    camera.position.set(Math.sin(t)*60, 30, Math.cos(t)*60); camera.lookAt(0, 0, 0);
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

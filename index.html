@@ -126,18 +126,18 @@
     #log { max-height:22vh; font-size:13px; }
     #help { display:none; }
     #top { gap:6px; top:8px; left:8px; right:8px; }
-    #top .pill { padding:7px 10px; font-size:13px; white-space:nowrap; }
+    #top .pill { padding:6px 9px; font-size:12px; white-space:nowrap; }
     #topLogo { height:24px; padding:3px 6px; min-width:0; flex-shrink:1; object-fit:contain; max-width:34vw; }
     #top .lbl { display:none; }            /* 좁은 화면: 퀴즈·투표는 그림만 */
-    #quizOpen, #voteOpen { font-size:18px !important; padding:5px 11px !important; }
+    #quizOpen, #voteOpen { font-size:16px !important; padding:4px 10px !important; }
     #voteOpen { margin-left:0; }
     /* 동작 버튼: 위쪽에 가로 한 줄로 */
-    #acts { top:54px; left:8px; transform:none; flex-direction:row; gap:6px; }
-    #acts button { width:52px; height:48px; font-size:18px; border-radius:12px; }
-    #acts button span { font-size:10px; }
-    #joy { width:104px; height:104px; left:12px; bottom:14px; }
-    #joyKnob { left:32px; top:32px; }
-    #chat { width:calc(100vw - 136px); right:8px; bottom:8px; }
+    #acts { top:48px; left:8px; transform:none; flex-direction:row; gap:5px; }
+    #acts button { width:42px; height:40px; font-size:15px; border-radius:10px; background:rgba(255,255,255,.82); }
+    #acts button span { font-size:9px; }
+    #joy { width:84px; height:84px; left:10px; bottom:12px; }
+    #joyKnob { left:25px; top:25px; width:30px; height:30px; }
+    #chat { width:calc(100vw - 112px); right:8px; bottom:8px; }
     #chat .btn { padding:10px 12px; }
   }
 </style>
@@ -975,7 +975,7 @@ function tapTo(cx, cy) {
   const move = (e) => {
     const r = pad.getBoundingClientRect();
     let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
-    const d = Math.hypot(dx, dy), max = 45; if (d > max) { dx *= max/d; dy *= max/d; }
+    const d = Math.hypot(dx, dy), max = r.width * 0.38; if (d > max) { dx *= max/d; dy *= max/d; }
     knob.style.transform = `translate(${dx}px,${dy}px)`; joy = { x: dx/max, y: dy/max };
   };
   pad.addEventListener('pointerdown', e => { e.stopPropagation(); pid = e.pointerId; pad.setPointerCapture(pid); move(e); });

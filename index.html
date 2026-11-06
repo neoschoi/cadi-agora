@@ -121,6 +121,9 @@
   #acts button.mic-on { background:#2ea05a; } #acts button.mic-on span { color:#fff; }
   #acts button.mic-wait { background:#e9b44c; }
   #hands { position:fixed; right:10px; top:60px; width:220px; max-height:50vh; overflow-y:auto; background:rgba(255,255,255,.95); border-radius:12px; padding:10px; z-index:7; box-shadow:0 4px 16px rgba(0,0,0,.18); font-size:14px; }
+  #gone { position:fixed; inset:0; z-index:40; background:rgba(11,22,48,.72); display:flex; align-items:center; justify-content:center; padding:16px; }
+  #gone .card { background:#fff; border-radius:16px; padding:24px; max-width:340px; text-align:center; font-size:16px; line-height:1.5; }
+  #gone .btn { margin-top:10px; width:100%; }
   #hands h4 { margin:0 0 6px; font-size:14px; color:#12224a; }
   #hands .row { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:4px 0; border-top:1px solid #eef1f5; }
   #hands button { border:0; border-radius:8px; padding:5px 9px; font-size:13px; cursor:pointer; background:#2ea05a; color:#fff; }
@@ -227,6 +230,7 @@
   <button id="aShout" class="shout">📢<span>소리치기</span></button>
 </div>
 <div id="hands" class="hidden"></div>
+<div id="gone" class="hidden"><div class="card"><p id="goneMsg"></p><button class="btn" id="goneBtn">다시 들어가기</button></div></div>
 <div id="joy" class="hidden"><div id="joyKnob"></div></div>
 
 <script type="importmap">
@@ -252,6 +256,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } }
 let myId = store('agora_id');
 if (!myId) { myId = crypto.randomUUID(); store('agora_id', myId); }
+const SID = crypto.randomUUID();   // 이 창(탭)만의 번호: 같은 기기에서 새로 들어오면 옛 창을 정리
 let myColor = store('agora_color') || COLORS[Math.floor(Math.random()*COLORS.length)];
 $('nick').value = store('agora_nick') || '';
 
@@ -537,6 +542,35 @@ const STAGE = new THREE.Vector3(-30, 0, -2);
   discs.push({ x: STAGE.x, z: STAGE.z, r: 7, h: 0.9 });
   for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 4), stone2); add(s, STAGE.x + 7.3 + i * 0.01, 0.15 + i * 0, STAGE.z); }
   const lec = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.2, 1.1), mat('#9a6a45')); add(lec, STAGE.x + 2, 1.5, STAGE.z);
+  // 강연 데스크 마이크 (받침 + 굽은 대 + 머리)
+  {
+    const mk = mat('#2b2e33', { metalness: .6, roughness: .35 });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.04, 16), mk); add(base, STAGE.x + 2.2, 2.12, STAGE.z);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.38, 0), new THREE.Vector3(-0.22, 0.48, 0));
+    const neck = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.016, 8), mk); add(neck, STAGE.x + 2.2, 2.14, STAGE.z);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), mat('#555a61', { metalness: .4, roughness: .6 })); head.scale.set(1.5, 1, 1); add(head, STAGE.x + 1.97, 2.62, STAGE.z);
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: '#2ee66b' })); add(led, STAGE.x + 2.2, 2.15, STAGE.z + 0.1);
+  }
+  // 무대 좌우 스피커 (삼각대 + 스피커 통)
+  {
+    const blk = mat('#1d1f24', { roughness: .6 }), grill = mat('#3a3d44', { roughness: .9 }), chrome = mat('#9aa0a8', { metalness: .7, roughness: .3 });
+    for (const sz of [-1, 1]) {
+      const sx = STAGE.x - 1.5, zz = STAGE.z + sz * 8.3, y0 = 0, PH = 2.6, S = 1.45;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, PH, 10), chrome); add(pole, sx, y0 + PH / 2, zz);
+      for (let k = 0; k < 3; k++) {
+        const ang = k * Math.PI * 2 / 3, leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.3, 8), chrome);
+        leg.position.set(sx + Math.cos(ang) * 0.4, y0 + 0.55, zz + Math.sin(ang) * 0.4);
+        leg.rotation.set(Math.sin(ang) * 0.65, 0, -Math.cos(ang) * 0.65); leg.castShadow = true; scene.add(leg);
+      }
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.75 * S, 1.25 * S, 0.85 * S), blk); add(box, sx, y0 + PH + 0.62 * S, zz);
+      box.rotation.y = -sz * 0.25;   // 객석 가운데를 향해 살짝
+      const face = new THREE.Group(); face.position.set(sx, y0 + PH + 0.62 * S, zz); face.rotation.y = Math.PI / 2 - sz * 0.25; face.scale.setScalar(S); scene.add(face);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.2), grill); panel.position.z = 0.38; face.add(panel);
+      const woof = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.05, 24), blk); woof.rotation.x = Math.PI / 2; woof.position.set(0, -0.18, 0.4); face.add(woof);
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 16), chrome); cone.rotation.x = Math.PI / 2; cone.position.set(0, -0.18, 0.42); face.add(cone);
+      const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16), blk); tw.rotation.x = Math.PI / 2; tw.position.set(0, 0.36, 0.4); face.add(tw);
+    }
+  }
   // 대형 스크린
   const wallB = new THREE.Mesh(new THREE.BoxGeometry(1.2, 9, 18), mat('#c9c0b0')); add(wallB, STAGE.x - 9.5, 4.5, STAGE.z);
   block(STAGE.x - 10.3, STAGE.x - 8.7, STAGE.z - 9, STAGE.z + 9);
@@ -1102,7 +1136,9 @@ async function join() {
     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
       if (key !== myId) addLog(`${esc(leftPresences[0]?.nick || '손님')} 님이 나갔습니다.`, 'sys');
     })
+    .on('broadcast', { event: 'takeover' }, ({ payload: p }) => { if (p.id === myId && p.sid !== SID) leaveAgora('같은 기기의 다른 창에서 다시 들어와서, 이 창은 광장에서 나왔어요.'); })
     .on('broadcast', { event: 'pos' }, ({ payload: p }) => {
+      if (p.id === myId) return;   // 내 옛 창이 보낸 위치는 무시 (유령 방지)
       const o = ensureOther(p.id, p.n, p.c, p.a, p.g);
       o.tx = p.x; o.tz = p.z; o.ty = p.y; o.ry = p.r; o.seen = performance.now(); o.placed = true; o.s = p.s || 0; o.nick = p.n;
       o.avatar.userData.micTag.visible = !!(o.s & 16);
@@ -1110,10 +1146,12 @@ async function join() {
         if (pp.hand && !hadHand) addLog(`✋ ${esc(p.n)} 님이 손을 들었습니다.`, 'sys'); }
     })
     .on('broadcast', { event: 'shout' }, ({ payload: p }) => {
+      if (p.id === myId) return;
       addLog(`<b style="color:#c0392b">📢 ${esc(p.n)}</b>${esc(p.t)}`);
       const o = others.get(p.id); if (o) { o.avatar.userData.shout = 3; shoutBubble(o.avatar, p.t); }
     })
     .on('broadcast', { event: 'chat' }, ({ payload: p }) => {
+      if (p.id === myId) return;
       addLog(`<b>${esc(p.n)}</b>${esc(p.t)}`);
       const o = others.get(p.id); if (o) say(o.avatar, p.t);
     })
@@ -1141,7 +1179,8 @@ async function join() {
   ['top','chat','acts'].forEach(id => $(id).classList.remove('hidden')); updateActBar();
   if (isTouch) $('joy').classList.remove('hidden'); else $('help').classList.remove('hidden');
 
-  await channel.track({ nick: me.nick, color: me.color, age: me.age, gender: me.gender, x: me.x, z: me.z });
+  await channel.track({ nick: me.nick, color: me.color, age: me.age, gender: me.gender, x: me.x, z: me.z, sid: SID });
+  channel.send({ type: 'broadcast', event: 'takeover', payload: { id: myId, sid: SID } });   // 같은 기기의 옛 창은 스스로 나가게
   sendPos(true);
   // 화면 갱신 (입장 전에 받은 접속자 반영)
   const now = channel.presenceState();
@@ -1157,6 +1196,25 @@ async function join() {
   (past || []).reverse().forEach(m => addLog(`<b>${esc(m.nickname)}</b>${esc(m.body)}`));
   addLog('아고라 마당에 들어왔습니다. 가고 싶은 곳을 찍으면 걸어가요.', 'sys');
 }
+// 광장에서 나가기: 창을 닫거나, 1분 넘게 다른 앱에 가 있거나, 같은 기기에서 새로 들어오면
+let goneTimer = null;
+function leaveAgora(msg) {
+  if (!channel) return;
+  const ch = channel; channel = null;
+  try { ch.untrack?.(); } catch {}
+  try { sb.removeChannel(ch); } catch {}
+  for (const id of [...peers.keys()]) closePeer(id, false);
+  voice.stream?.getTracks().forEach(t => t.stop()); voice.stream = null; voice.micOn = false;
+  for (const id of [...others.keys()]) removeOther(id);
+  if (msg) { $('goneMsg').textContent = msg; $('gone').classList.remove('hidden'); }
+}
+$('goneBtn').onclick = () => location.reload();
+addEventListener('pagehide', () => leaveAgora(''));
+addEventListener('pageshow', e => { if (e.persisted && entered) location.reload(); });
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(goneTimer);
+  if (document.hidden && entered) goneTimer = setTimeout(() => leaveAgora('1분 넘게 자리를 비워서 광장에서 나왔어요.'), 60000);
+});
 // 소개 화면: 5초 뒤 자동으로 닫힘 (누르면 바로)
 let introTimer = null;
 function closeIntro() { clearTimeout(introTimer); store('agora_intro_seen', '1'); $('intro').classList.add('hidden'); }

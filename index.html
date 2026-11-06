@@ -1399,7 +1399,7 @@ loop();
 {
   // 페이지를 연 지 3초가 될 때까지, 그리고 장면이 그려진 뒤 최소 0.9초는 보여줌
   const hide = () => { $('loader').classList.add('out'); setTimeout(() => $('loader').remove(), 1000); };
-  if (!store('agora_intro_seen')) showIntro();
+  showIntro();   // 들어올 때마다 소개를 5초 보여 줌
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(hide, Math.max(900, 3000 - performance.now()))));
 }
 

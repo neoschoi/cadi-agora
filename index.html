@@ -23,6 +23,20 @@
   #loader .lo { position:absolute; bottom:28px; color:#6f7fa3; font-size:12px; letter-spacing:.1em; }
   @keyframes lin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
   @keyframes dot { 0%,100% { opacity:.25; } 50% { opacity:1; } }
+  /* 소개 화면 */
+  #intro { position:fixed; inset:0; z-index:25; background:radial-gradient(ellipse at 50% 30%, #16243f 0%, #0b1630 75%); display:flex; align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
+  #intro .ic { max-width:560px; width:100%; color:#e6ebf5; text-align:center; animation:lin 1s both; }
+  #intro .ik { color:#c9a96e; letter-spacing:.2em; font-size:14px; font-weight:700; }
+  #intro h2 { color:#f3ead6; font-size:28px; margin:10px 0 18px; }
+  #intro p { font-size:16px; line-height:1.75; color:#cdd5e7; margin:0 0 12px; word-break:keep-all; }
+  #intro p b { color:#f3ead6; }
+  #intro .ig { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:22px 0; }
+  #intro .ig div { background:rgba(255,255,255,.06); border:1px solid rgba(201,169,110,.35); border-radius:14px; padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
+  #intro .ig span { font-size:26px; } #intro .ig b { color:#f3ead6; font-size:16px; } #intro .ig small { color:#a9b6d3; font-size:13px; }
+  #intro .btn { background:#c9a96e; color:#0b1630; font-weight:800; padding:14px 30px; font-size:17px; }
+  #intro .io { margin-top:22px; color:#6f7fa3; font-size:12px; letter-spacing:.1em; }
+  #nickErr { color:#c0392b; font-size:14px; min-height:18px; margin:-6px 0 8px; }
+  #introAgain { display:block; text-align:center; margin-top:12px; font-size:13px; color:#5b6572; }
   /* 입장 화면 */
   #enter { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(160deg,#e9f1fa,#f7efe2); z-index:20; padding:16px; }
   #enter .card { background:#fff; border-radius:18px; padding:28px; width:100%; max-width:380px; box-shadow:0 10px 40px rgba(0,0,0,.12); }
@@ -113,6 +127,23 @@
   <div class="ld"><i></i><i></i><i></i></div>
   <div class="lo">(사)자치분권연구소</div>
 </div>
+<div id="intro" class="hidden">
+  <div class="ic">
+    <div class="ik">자치분권 아고라</div>
+    <h2>아고라는 어떤 곳인가요?</h2>
+    <p>옛 그리스의 <b>아고라</b>는 시민들이 모여 이야기하고, 함께 결정하던 광장이었습니다.
+    <b>자치분권 아고라</b>는 그 정신을 우리 한옥 마당에 옮긴 온라인 공론장입니다.</p>
+    <p>가입 없이 이름만 정하면 누구나 아바타로 들어와 이웃과 이야기하고, 마을의 안건을 함께 정할 수 있어요.</p>
+    <div class="ig">
+      <div><span>🗣️</span><b>토론 · 강연</b><small>무대에서 듣고, 손 들고 말하기</small></div>
+      <div><span>🗳️</span><b>안건 투표</b><small>우리 동네 일을 함께 결정</small></div>
+      <div><span>📖</span><b>함께 읽기</b><small>한옥 북카페에서 책 나누기</small></div>
+      <div><span>🔔</span><b>골든벨 퀴즈</b><small>주민자치 100문 100답</small></div>
+    </div>
+    <button class="btn" id="introGo">마당으로 들어가기</button>
+    <div class="io">(사)자치분권연구소</div>
+  </div>
+</div>
 <div id="enter">
   <div class="card">
     <img class="logo" src="logo.png" alt="(사)자치분권연구소">
@@ -125,7 +156,9 @@
     <div class="seg" id="genderSeg"></div>
     <div class="fieldLabel">옷 색깔</div>
     <div class="colors" id="colors"></div>
+    <div id="nickErr"></div>
     <button class="btn" id="enterBtn">광장 입장</button>
+    <a href="#" id="introAgain">아고라 소개 다시 보기</a>
   </div>
 </div>
 
@@ -1001,27 +1034,21 @@ function addLog(html, cls='m') {
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+const normName = n => n.replace(/\s+/g, '').toLowerCase();
+let entered = false, syncReady = null, joining = false;
 async function join() {
-  const nick = $('nick').value.trim().slice(0, 12);
+  if (joining || entered) return;
+  const nick = $('nick').value.trim().replace(/\s+/g, ' ').slice(0, 12);
   if (!nick) { $('nick').focus(); return; }
+  joining = true; $('nickErr').textContent = ''; $('enterBtn').disabled = true; $('enterBtn').textContent = '이름 확인 중…';
   me.nick = nick; me.color = myColor; me.age = myAge; me.gender = myGender;
-  store('agora_nick', nick); store('agora_color', myColor); store('agora_age', myAge); store('agora_gender', myGender);
-  me.x = (Math.random()-0.5)*4; me.z = 32 + Math.random()*3;
-  me.avatar = makeAvatar(nick, myColor, myAge, myGender);
 
-  $('enter').classList.add('hidden');
-  ['top','chat','acts'].forEach(id => $(id).classList.remove('hidden')); updateActBar();
-  if (isTouch) $('joy').classList.remove('hidden'); else $('help').classList.remove('hidden');
-
-  // 지난 대화 30개 불러오기
-  const { data: past } = await sb.from('messages').select('nickname, body, created_at').order('created_at', { ascending: false }).limit(30);
-  (past || []).reverse().forEach(m => addLog(`<b>${esc(m.nickname)}</b>${esc(m.body)}`));
-  addLog('아고라 마당에 들어왔습니다. 가고 싶은 곳을 찍으면 걸어가요.', 'sys');
-
+  // 광장에 먼저 연결해서, 지금 들어와 있는 사람들 이름을 확인
   channel = sb.channel('agora-main', { config: { presence: { key: myId }, broadcast: { self: false } } });
   channel
     .on('presence', { event: 'sync' }, () => {
       const st = channel.presenceState();
+      if (!entered) { syncReady?.(); return; }
       $('online').textContent = `접속 ${Object.keys(st).length}명`;
       for (const id of [...others.keys()]) if (!st[id]) removeOther(id);
       for (const [id, metas] of Object.entries(st)) {
@@ -1051,13 +1078,45 @@ async function join() {
       const o = others.get(p.id); if (o) say(o.avatar, p.t);
     })
     .on('broadcast', { event: 'voted' }, () => { if (!$('vote').classList.contains('hidden')) loadAgendas(); })
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await channel.track({ nick: me.nick, color: me.color, age: me.age, gender: me.gender, x: me.x, z: me.z });
-        sendPos(true);
-      }
-    });
+    .subscribe();
+  await new Promise(res => { syncReady = res; setTimeout(res, 3000); });
+  syncReady = null;
+  const st = channel.presenceState();
+  const taken = Object.entries(st).some(([id, metas]) => id !== myId && metas.some(m => normName(m.nick || '') === normName(nick)));
+  if (taken) {
+    sb.removeChannel(channel); channel = null;
+    for (const id of [...others.keys()]) removeOther(id);
+    $('nickErr').textContent = `'${nick}' 이름은 지금 광장에 이미 있어요. 다른 이름을 써 주세요. (예: ${nick}2, ${nick}(동네이름))`;
+    $('enterBtn').disabled = false; $('enterBtn').textContent = '광장 입장'; joining = false; $('nick').focus(); $('nick').select();
+    return;
+  }
+  entered = true; joining = false;
+  store('agora_nick', nick); store('agora_color', myColor); store('agora_age', myAge); store('agora_gender', myGender);
+  me.x = (Math.random()-0.5)*4; me.z = 32 + Math.random()*3;
+  me.avatar = makeAvatar(nick, myColor, myAge, myGender);
+
+  $('enter').classList.add('hidden');
+  ['top','chat','acts'].forEach(id => $(id).classList.remove('hidden')); updateActBar();
+  if (isTouch) $('joy').classList.remove('hidden'); else $('help').classList.remove('hidden');
+
+  await channel.track({ nick: me.nick, color: me.color, age: me.age, gender: me.gender, x: me.x, z: me.z });
+  sendPos(true);
+  // 화면 갱신 (입장 전에 받은 접속자 반영)
+  const now = channel.presenceState();
+  $('online').textContent = `접속 ${Object.keys(now).length}명`;
+  for (const [id, metas] of Object.entries(now)) {
+    if (id === myId) continue; const m = metas[0];
+    const o = ensureOther(id, m.nick, m.color, m.age, m.gender);
+    if (!o.placed) { o.tx = m.x ?? 0; o.tz = m.z ?? 30; o.avatar.position.set(o.tx, 0, o.tz); o.placed = true; }
+  }
+
+  // 지난 대화 30개 불러오기
+  const { data: past } = await sb.from('messages').select('nickname, body, created_at').order('created_at', { ascending: false }).limit(30);
+  (past || []).reverse().forEach(m => addLog(`<b>${esc(m.nickname)}</b>${esc(m.body)}`));
+  addLog('아고라 마당에 들어왔습니다. 가고 싶은 곳을 찍으면 걸어가요.', 'sys');
 }
+$('introGo').onclick = () => { store('agora_intro_seen', '1'); $('intro').classList.add('hidden'); };
+$('introAgain').onclick = e => { e.preventDefault(); $('intro').classList.remove('hidden'); };
 $('enterBtn').onclick = join;
 $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 
@@ -1315,6 +1374,7 @@ loop();
 {
   // 페이지를 연 지 3초가 될 때까지, 그리고 장면이 그려진 뒤 최소 0.9초는 보여줌
   const hide = () => { $('loader').classList.add('out'); setTimeout(() => $('loader').remove(), 1000); };
+  if (!store('agora_intro_seen')) $('intro').classList.remove('hidden');
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(hide, Math.max(900, 3000 - performance.now()))));
 }
 
